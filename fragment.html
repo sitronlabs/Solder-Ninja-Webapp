@@ -203,11 +203,6 @@
 					<button id="loadImageBtn" type="button">Load Image</button>
 					<input type="file" id="imageFileInput" accept="image/*" style="display: none;">
 				</div>
-				<div style="margin-top: 5px; font-size: 12px; color: #666;">
-					<label>Threshold: <input type="range" id="thresholdSlider" min="0" max="255" value="128"
-							style="width: 100px; vertical-align: middle;"></label>
-					<span id="thresholdValue">128</span>
-				</div>
 			</div>
 		</div>
 		<div class="controls">
@@ -320,9 +315,6 @@
 		$('#invertIconBtn').click(invertIcon);
 		$('#loadImageBtn').click(() => $('#imageFileInput').click());
 		$('#imageFileInput').change(handleImageLoad);
-		$('#thresholdSlider').on('input', function () {
-			$('#thresholdValue').text($(this).val());
-		});
 
 		// Log controls
 		$('#clearLogBtn').click(clearLog);
@@ -891,36 +883,34 @@
 	// Handle image loading and conversion to icon
 	async function handleImageLoad(event) {
 		const file = event.target.files[0];
-		if (!file) return;
-
-		// Check if it's an image
-		if (!file.type.startsWith('image/')) {
-			logMessage('Error: Selected file is not an image');
+		if (!file) {
+			logMessage('No file selected');
 			return;
 		}
+
+		logMessage('Loading image: ' + file.name);
 
 		try {
 			// Load image
 			const image = await loadImageFromFile(file);
+			logMessage('Image loaded, processing...');
 
-			// Get threshold value
-			const threshold = parseInt($('#thresholdSlider').val());
-
-			// Process image: resize to 16x16 and convert to black/white
-			const pixels = processImageToBitmap(image, threshold);
+			// Process image: resize to 16x16 and convert to black/white with threshold 128
+			const pixels = processImageToBitmap(image, 128);
 
 			// Update icon editor
 			iconPixels = pixels;
 			updateIconDisplay();
 
-			logMessage('Image loaded and converted to icon');
+			logMessage('Image converted to icon successfully');
 
 		} catch (error) {
 			logMessage('Error loading image: ' + error.message);
+			console.error('Image loading error:', error);
 		}
 
 		// Clear file input so same file can be selected again
-		$('#imageFileInput').val('');
+		event.target.value = '';
 	}
 
 	// Load image from file
@@ -940,33 +930,41 @@
 
 	// Process image: resize to 16x16 and convert to black/white bitmap
 	function processImageToBitmap(image, threshold) {
-		// Create a canvas for resizing and processing
-		const canvas = document.createElement('canvas');
-		canvas.width = 16;
-		canvas.height = 16;
-		const ctx = canvas.getContext('2d');
+		try {
+			// Create a canvas for resizing and processing
+			const canvas = document.createElement('canvas');
+			canvas.width = 16;
+			canvas.height = 16;
+			const ctx = canvas.getContext('2d');
 
-		// Draw image to canvas (resize to 16x16)
-		ctx.drawImage(image, 0, 0, 16, 16);
+			// Use image smoothing for better quality when resizing
+			ctx.imageSmoothingEnabled = true;
+			ctx.imageSmoothingQuality = 'high';
 
-		// Get image data
-		const imageData = ctx.getImageData(0, 0, 16, 16);
-		const data = imageData.data;
+			// Draw image to canvas (resize to 16x16)
+			ctx.drawImage(image, 0, 0, 16, 16);
 
-		// Convert to bitmap (black/white based on threshold)
-		const pixels = [];
-		for (let i = 0; i < data.length; i += 4) {
-			// Convert RGB to grayscale using standard weights
-			const r = data[i];
-			const g = data[i + 1];
-			const b = data[i + 2];
-			const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+			// Get image data
+			const imageData = ctx.getImageData(0, 0, 16, 16);
+			const data = imageData.data;
 
-			// Apply threshold: if grayscale value is above threshold, make it white (false), otherwise black (true)
-			// Inverting so that darker areas become black pixels
-			pixels.push(gray < threshold);
+			// Convert to bitmap (black/white based on threshold)
+			const pixels = [];
+			for (let i = 0; i < data.length; i += 4) {
+				// Convert RGB to grayscale using standard weights
+				const r = data[i];
+				const g = data[i + 1];
+				const b = data[i + 2];
+				const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+
+				// Apply threshold: if grayscale value is below threshold, make it black (true), otherwise white (false)
+				pixels.push(gray < threshold);
+			}
+
+			return pixels;
+		} catch (error) {
+			console.error('Error processing image:', error);
+			throw new Error('Failed to process image: ' + error.message);
 		}
-
-		return pixels;
 	}
 </script>
