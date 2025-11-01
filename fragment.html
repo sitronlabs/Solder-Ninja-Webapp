@@ -111,6 +111,10 @@
 		padding: 0;
 		margin: 0;
 		box-sizing: border-box;
+		user-select: none;
+		-webkit-user-select: none;
+		-moz-user-select: none;
+		-ms-user-select: none;
 	}
 
 	.soldering-iron-app .icon-pixel.black {
@@ -190,7 +194,7 @@
 			<div>
 				<h3>Icon (16x16 bitmap)</h3>
 				<div id="iconEditor"
-					style="display: inline-block; border: 2px solid #333; padding: 5px; background: white;">
+					style="display: inline-block; border: 2px solid #333; padding: 5px; background: white; user-select: none;">
 					<!-- Icon grid will be generated here -->
 				</div>
 				<div style="margin-top: 10px;">
@@ -243,6 +247,8 @@
 	let readBuffer = ''; // Buffer for incomplete JSON responses
 	let temperatureUpdateTimeout = null; // Debounce timer for temperature updates
 	let iconPixels = Array(16 * 16).fill(false); // 16x16 bitmap, false = white, true = black
+	let isDragging = false; // Track if mouse is being dragged
+	let dragAction = null; // Track what action to perform during drag (true = set black, false = set white)
 
 	// Initialize the application
 	$(document).ready(function () {
@@ -622,17 +628,51 @@
 			const rowDiv = $('<div class="icon-row"></div>');
 			for (let col = 0; col < 16; col++) {
 				const pixel = $('<div class="icon-pixel" data-row="' + row + '" data-col="' + col + '"></div>');
-				pixel.on('click', function () {
+
+				// Mouse down - start drag
+				pixel.on('mousedown', function (e) {
+					e.preventDefault();
 					const r = parseInt($(this).data('row'));
 					const c = parseInt($(this).data('col'));
 					const index = r * 16 + c;
-					iconPixels[index] = !iconPixels[index];
+
+					// Determine action based on current pixel state
+					dragAction = !iconPixels[index];
+					isDragging = true;
+
+					// Set the initial pixel
+					iconPixels[index] = dragAction;
 					updateIconDisplay();
 				});
+
+				// Mouse enter while dragging - continue drawing
+				pixel.on('mouseenter', function () {
+					if (isDragging && dragAction !== null) {
+						const r = parseInt($(this).data('row'));
+						const c = parseInt($(this).data('col'));
+						const index = r * 16 + c;
+						iconPixels[index] = dragAction;
+						updateIconDisplay();
+					}
+				});
+
 				rowDiv.append(pixel);
 			}
 			editor.append(rowDiv);
 		}
+
+		// Stop dragging when mouse leaves the editor or mouse is released
+		editor.on('mouseleave', function () {
+			isDragging = false;
+			dragAction = null;
+		});
+
+		// Stop dragging on mouse up anywhere
+		$(document).on('mouseup', function () {
+			isDragging = false;
+			dragAction = null;
+		});
+
 		updateIconDisplay();
 	}
 
