@@ -937,11 +937,16 @@
 			canvas.height = 16;
 			const ctx = canvas.getContext('2d');
 
+			// Fill with white background first (handles transparent PNGs)
+			ctx.fillStyle = '#FFFFFF';
+			ctx.fillRect(0, 0, 16, 16);
+
 			// Use image smoothing for better quality when resizing
 			ctx.imageSmoothingEnabled = true;
 			ctx.imageSmoothingQuality = 'high';
 
 			// Draw image to canvas (resize to 16x16)
+			// This will composite transparent areas onto the white background
 			ctx.drawImage(image, 0, 0, 16, 16);
 
 			// Get image data
@@ -951,10 +956,19 @@
 			// Convert to bitmap (black/white based on threshold)
 			const pixels = [];
 			for (let i = 0; i < data.length; i += 4) {
-				// Convert RGB to grayscale using standard weights
+				// Get RGBA values
 				const r = data[i];
 				const g = data[i + 1];
 				const b = data[i + 2];
+				const a = data[i + 3]; // alpha channel
+
+				// If pixel is transparent or very transparent, make it white
+				if (a < 128) {
+					pixels.push(false); // white
+					continue;
+				}
+
+				// Convert RGB to grayscale using standard weights
 				const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
 
 				// Apply threshold: if grayscale value is below threshold, make it black (true), otherwise white (false)
