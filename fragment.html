@@ -104,10 +104,10 @@
 	.soldering-iron-app .icon-pixel {
 		width: 12px;
 		height: 12px;
-		border: 1px solid #ccc;
+		border: 1px solid #333;
 		display: inline-block;
 		cursor: pointer;
-		background-color: white;
+		background-color: black;
 		padding: 0;
 		margin: 0;
 		box-sizing: border-box;
@@ -118,7 +118,7 @@
 	}
 
 	.soldering-iron-app .icon-pixel.black {
-		background-color: black;
+		background-color: white;
 	}
 
 	.soldering-iron-app .icon-pixel:hover {
@@ -189,7 +189,7 @@
 			<div>
 				<h3>Icon (16x16 bitmap)</h3>
 				<div id="iconEditor"
-					style="display: inline-block; border: 2px solid #333; padding: 5px; background: white; user-select: none;">
+					style="display: inline-block; border: 2px solid #333; padding: 5px; background: black; user-select: none;">
 					<!-- Icon grid will be generated here -->
 				</div>
 				<div style="margin-top: 10px;">
@@ -243,9 +243,9 @@
 	let statusUpdateInterval = null;
 	let readBuffer = ''; // Buffer for incomplete JSON responses
 	let temperatureUpdateTimeout = null; // Debounce timer for temperature updates
-	let iconPixels = Array(16 * 16).fill(false); // 16x16 bitmap, false = white, true = black
+	let iconPixels = Array(16 * 16).fill(false); // 16x16 bitmap, false = inactive (black on OLED), true = active (white on OLED)
 	let isDragging = false; // Track if mouse is being dragged
-	let dragAction = null; // Track what action to perform during drag (true = set black, false = set white)
+	let dragAction = null; // Track what action to perform during drag (true = set active/white, false = set inactive/black)
 	let continuousReadActive = false; // Track if continuous read loop is running
 
 	// Initialize the application
