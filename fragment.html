@@ -199,7 +199,14 @@
 				</div>
 				<div style="margin-top: 10px;">
 					<button id="clearIconBtn" type="button" style="margin-right: 5px;">Clear Icon</button>
-					<button id="invertIconBtn" type="button">Invert Icon</button>
+					<button id="invertIconBtn" type="button" style="margin-right: 5px;">Invert Icon</button>
+					<button id="loadImageBtn" type="button">Load Image</button>
+					<input type="file" id="imageFileInput" accept="image/*" style="display: none;">
+				</div>
+				<div style="margin-top: 5px; font-size: 12px; color: #666;">
+					<label>Threshold: <input type="range" id="thresholdSlider" min="0" max="255" value="128"
+							style="width: 100px; vertical-align: middle;"></label>
+					<span id="thresholdValue">128</span>
 				</div>
 			</div>
 		</div>
@@ -311,6 +318,11 @@
 		$('#saveUserInfoBtn').click(saveUserInfo);
 		$('#clearIconBtn').click(clearIcon);
 		$('#invertIconBtn').click(invertIcon);
+		$('#loadImageBtn').click(() => $('#imageFileInput').click());
+		$('#imageFileInput').change(handleImageLoad);
+		$('#thresholdSlider').on('input', function () {
+			$('#thresholdValue').text($(this).val());
+		});
 
 		// Log controls
 		$('#clearLogBtn').click(clearLog);
@@ -874,5 +886,87 @@
 			icon: iconBytes,
 			name: [line1, line2]
 		});
+	}
+
+	// Handle image loading and conversion to icon
+	async function handleImageLoad(event) {
+		const file = event.target.files[0];
+		if (!file) return;
+
+		// Check if it's an image
+		if (!file.type.startsWith('image/')) {
+			logMessage('Error: Selected file is not an image');
+			return;
+		}
+
+		try {
+			// Load image
+			const image = await loadImageFromFile(file);
+
+			// Get threshold value
+			const threshold = parseInt($('#thresholdSlider').val());
+
+			// Process image: resize to 16x16 and convert to black/white
+			const pixels = processImageToBitmap(image, threshold);
+
+			// Update icon editor
+			iconPixels = pixels;
+			updateIconDisplay();
+
+			logMessage('Image loaded and converted to icon');
+
+		} catch (error) {
+			logMessage('Error loading image: ' + error.message);
+		}
+
+		// Clear file input so same file can be selected again
+		$('#imageFileInput').val('');
+	}
+
+	// Load image from file
+	function loadImageFromFile(file) {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = function (e) {
+				const img = new Image();
+				img.onload = () => resolve(img);
+				img.onerror = () => reject(new Error('Failed to load image'));
+				img.src = e.target.result;
+			};
+			reader.onerror = () => reject(new Error('Failed to read file'));
+			reader.readAsDataURL(file);
+		});
+	}
+
+	// Process image: resize to 16x16 and convert to black/white bitmap
+	function processImageToBitmap(image, threshold) {
+		// Create a canvas for resizing and processing
+		const canvas = document.createElement('canvas');
+		canvas.width = 16;
+		canvas.height = 16;
+		const ctx = canvas.getContext('2d');
+
+		// Draw image to canvas (resize to 16x16)
+		ctx.drawImage(image, 0, 0, 16, 16);
+
+		// Get image data
+		const imageData = ctx.getImageData(0, 0, 16, 16);
+		const data = imageData.data;
+
+		// Convert to bitmap (black/white based on threshold)
+		const pixels = [];
+		for (let i = 0; i < data.length; i += 4) {
+			// Convert RGB to grayscale using standard weights
+			const r = data[i];
+			const g = data[i + 1];
+			const b = data[i + 2];
+			const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+
+			// Apply threshold: if grayscale value is above threshold, make it white (false), otherwise black (true)
+			// Inverting so that darker areas become black pixels
+			pixels.push(gray < threshold);
+		}
+
+		return pixels;
 	}
 </script>
