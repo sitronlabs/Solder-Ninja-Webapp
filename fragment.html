@@ -249,6 +249,7 @@
 	let iconPixels = Array(16 * 16).fill(false); // 16x16 bitmap, false = white, true = black
 	let isDragging = false; // Track if mouse is being dragged
 	let dragAction = null; // Track what action to perform during drag (true = set black, false = set white)
+	let continuousReadActive = false; // Track if continuous read loop is running
 
 	// Initialize the application
 	$(document).ready(function () {
@@ -339,6 +340,7 @@
 			isConnected = true;
 			updateConnectionStatus(true);
 			startStatusUpdates();
+			startContinuousRead();
 
 			logMessage('Connected to device');
 
@@ -354,24 +356,41 @@
 	}
 
 	async function disconnectFromDevice() {
+		if (!isConnected) return; // Already disconnected
+
 		try {
 			if (statusUpdateInterval) {
 				clearInterval(statusUpdateInterval);
 				statusUpdateInterval = null;
 			}
 
+			continuousReadActive = false; // Stop continuous read loop
+
 			if (reader) {
-				await reader.releaseLock();
+				try {
+					await reader.cancel();
+					await reader.releaseLock();
+				} catch (e) {
+					// Reader may already be released
+				}
 				reader = null;
 			}
 
 			if (writer) {
-				await writer.releaseLock();
+				try {
+					await writer.releaseLock();
+				} catch (e) {
+					// Writer may already be released
+				}
 				writer = null;
 			}
 
 			if (serialPort) {
-				await serialPort.close();
+				try {
+					await serialPort.close();
+				} catch (e) {
+					// Port may already be closed
+				}
 				serialPort = null;
 			}
 
@@ -382,6 +401,9 @@
 
 		} catch (error) {
 			logMessage('Disconnect error: ' + error.message);
+			// Force update UI even if cleanup fails
+			isConnected = false;
+			updateConnectionStatus(false);
 		}
 	}
 
@@ -421,6 +443,11 @@
 			logMessage('Sent: ' + commandStr.trim());
 		} catch (error) {
 			logMessage('Send error: ' + error.message);
+			// Check if connection was lost
+			if (error.name === 'NetworkError' || error.name === 'InvalidStateError' ||
+				error.message.includes('closed') || error.message.includes('disconnected')) {
+				handleDisconnection('Device disconnected during send operation');
+			}
 		}
 	}
 
@@ -429,7 +456,10 @@
 
 		try {
 			const { value, done } = await reader.read();
-			if (done) return;
+			if (done) {
+				handleDisconnection('Device disconnected (read stream ended)');
+				return;
+			}
 
 			const decoder = new TextDecoder();
 			const newData = decoder.decode(value);
@@ -465,7 +495,93 @@
 			}
 		} catch (error) {
 			logMessage('Read error: ' + error.message);
+			// Check if connection was lost
+			if (error.name === 'NetworkError' || error.name === 'InvalidStateError' ||
+				error.message.includes('closed') || error.message.includes('disconnected') ||
+				error.message.includes('The port has been closed')) {
+				handleDisconnection('Device disconnected during read operation');
+			}
 		}
+	}
+
+	// Handle automatic disconnection (when device is unplugged or connection lost)
+	async function handleDisconnection(reason) {
+		if (!isConnected) return; // Already disconnected
+
+		logMessage('Connection lost: ' + reason);
+		continuousReadActive = false; // Stop continuous read loop
+
+		try {
+			if (statusUpdateInterval) {
+				clearInterval(statusUpdateInterval);
+				statusUpdateInterval = null;
+			}
+
+			if (reader) {
+				try {
+					await reader.cancel();
+					await reader.releaseLock();
+				} catch (e) {
+					// Reader may already be released
+				}
+				reader = null;
+			}
+
+			if (writer) {
+				try {
+					await writer.releaseLock();
+				} catch (e) {
+					// Writer may already be released
+				}
+				writer = null;
+			}
+
+			if (serialPort) {
+				try {
+					await serialPort.close();
+				} catch (e) {
+					// Port may already be closed
+				}
+				serialPort = null;
+			}
+
+			isConnected = false;
+			readBuffer = ''; // Clear the read buffer
+			updateConnectionStatus(false);
+			logMessage('Disconnected from device');
+		} catch (error) {
+			logMessage('Error during automatic disconnect: ' + error.message);
+			// Force update UI even if cleanup fails
+			isConnected = false;
+			updateConnectionStatus(false);
+		}
+	}
+
+	// Start continuous read loop to detect disconnections
+	async function startContinuousRead() {
+		continuousReadActive = true;
+
+		async function readLoop() {
+			while (continuousReadActive && isConnected && reader) {
+				try {
+					await readResponse();
+					// Small delay to prevent tight loop
+					await new Promise(resolve => setTimeout(resolve, 10));
+				} catch (error) {
+					if (continuousReadActive) {
+						// Only handle if still supposed to be reading
+						if (error.name === 'NetworkError' || error.name === 'InvalidStateError' ||
+							error.message.includes('closed') || error.message.includes('disconnected') ||
+							error.message.includes('The port has been closed')) {
+							handleDisconnection('Device disconnected during read loop');
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		readLoop();
 	}
 
 	function handleResponse(data) {
@@ -550,7 +666,6 @@
 		statusUpdateInterval = setInterval(async () => {
 			if (isConnected) {
 				await sendCommand({ action: 'status_get' });
-				await readResponse();
 			}
 		}, 1000); // Update every second
 	}
