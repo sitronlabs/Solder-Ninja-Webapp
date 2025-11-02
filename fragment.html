@@ -197,16 +197,22 @@
 </div>
 
 <script>
-	let serialPort = null;
-	let writer = null;
-	let reader = null;
-	let isConnected = false;
-	let statusUpdateInterval = null;
-	let readBuffer = ''; // Buffer for incomplete JSON responses
-	let temperatureUpdateTimeout = null; // Debounce timer for temperature updates
+
+	/* Serial port variables */
+	let serial_port = null;
+	let serial_port_connected = false;
+	let serial_port_writer = null;
+	let serial_port_reader = null;
+	let serial_port_reader_buffer = ''; // Buffer for incomplete JSON responses
+
+	/* Icon editor variables */
 	let iconPixels = Array(16 * 16).fill(false); // 16x16 bitmap, false = inactive (black on OLED), true = active (white on OLED)
 	let isDragging = false; // Track if mouse is being dragged
 	let dragAction = null; // Track what action to perform during drag (true = set active/white, false = set inactive/black)
+
+	/* Other */
+	let statusUpdateInterval = null;
+	let temperatureUpdateTimeout = null; // Debounce timer for temperature updates
 	let continuousReadActive = false; // Track if continuous read loop is running
 
 	// Initialize the application
@@ -226,7 +232,7 @@
 			const newValue = $(this).val();
 			$('#tempInput').val(newValue);
 			// Automatically send temperature when slider changes (debounced)
-			if (isConnected) {
+			if (serial_port_connected) {
 				// Clear any pending temperature update
 				if (temperatureUpdateTimeout) {
 					clearTimeout(temperatureUpdateTimeout);
@@ -241,7 +247,7 @@
 			const newValue = $(this).val();
 			$('#tempSlider').val(newValue);
 			// Automatically send temperature when input changes (debounced)
-			if (isConnected) {
+			if (serial_port_connected) {
 				// Clear any pending temperature update
 				if (temperatureUpdateTimeout) {
 					clearTimeout(temperatureUpdateTimeout);
@@ -275,13 +281,15 @@
 
 	async function connectToDevice() {
 		try {
+
+			/* Check if the Web Serial API is supported */
 			if (!('serial' in navigator)) {
 				logMessage('Web Serial API not supported in this browser');
 				return;
 			}
 
-			// Request port with specific VID and PID filters
-			serialPort = await navigator.serial.requestPort({
+			/* Request port with specific VID and PID filters */
+			serial_port = await navigator.serial.requestPort({
 				filters: [
 					{
 						usbVendorId: 0x2E8A,
@@ -289,12 +297,16 @@
 					}
 				]
 			});
-			await serialPort.open({ baudRate: 115200 });
 
-			writer = serialPort.writable.getWriter();
-			reader = serialPort.readable.getReader();
+			/* Open the serial port */
+			await serial_port.open({ baudRate: 115200 });
 
-			isConnected = true;
+			/* Get writer and reader for the serial port */
+			serial_port_writer = serial_port.writable.getWriter();
+			serial_port_reader = serial_port.readable.getReader();
+
+			/* Set connection status and start status updates and continuous read */
+			serial_port_connected = true;
 			updateConnectionStatus(true);
 			startStatusUpdates();
 			startContinuousRead();
@@ -313,7 +325,11 @@
 	}
 
 	async function disconnectFromDevice() {
-		if (!isConnected) return; // Already disconnected
+
+		/* Skip if already disconnected */
+		if (!serial_port_connected) {
+			return;
+		}
 
 		try {
 			if (statusUpdateInterval) {
@@ -323,43 +339,43 @@
 
 			continuousReadActive = false; // Stop continuous read loop
 
-			if (reader) {
+			if (serial_port_reader) {
 				try {
-					await reader.cancel();
-					await reader.releaseLock();
+					await serial_port_reader.cancel();
+					await serial_port_reader.releaseLock();
 				} catch (e) {
 					// Reader may already be released
 				}
-				reader = null;
+				serial_port_reader = null;
 			}
 
-			if (writer) {
+			if (serial_port_writer) {
 				try {
-					await writer.releaseLock();
+					await serial_port_writer.releaseLock();
 				} catch (e) {
 					// Writer may already be released
 				}
-				writer = null;
+				serial_port_writer = null;
 			}
 
-			if (serialPort) {
+			if (serial_port) {
 				try {
-					await serialPort.close();
+					await serial_port.close();
 				} catch (e) {
 					// Port may already be closed
 				}
-				serialPort = null;
+				serial_port = null;
 			}
 
-			isConnected = false;
-			readBuffer = ''; // Clear the read buffer
+			serial_port_connected = false;
+			serial_port_reader_buffer = ''; // Clear the read buffer
 			updateConnectionStatus(false);
 			logMessage('Disconnected from device');
 
 		} catch (error) {
 			logMessage('Disconnect error: ' + error.message);
 			// Force update UI even if cleanup fails
-			isConnected = false;
+			serial_port_connected = false;
 			updateConnectionStatus(false);
 		}
 	}
@@ -388,7 +404,7 @@
 	}
 
 	async function sendCommand(command) {
-		if (!isConnected || !writer) {
+		if (!serial_port_connected || !serial_port_writer) {
 			logMessage('Not connected to device');
 			return;
 		}
@@ -396,7 +412,7 @@
 		try {
 			const commandStr = JSON.stringify(command) + '\r\n';
 			const encoder = new TextEncoder();
-			await writer.write(encoder.encode(commandStr));
+			await serial_port_writer.write(encoder.encode(commandStr));
 			logMessage('Sent: ' + commandStr.trim());
 		} catch (error) {
 			logMessage('Send error: ' + error.message);
@@ -409,10 +425,10 @@
 	}
 
 	async function readResponse() {
-		if (!reader) return;
+		if (!serial_port_reader) return;
 
 		try {
-			const { value, done } = await reader.read();
+			const { value, done } = await serial_port_reader.read();
 			if (done) {
 				handleDisconnection('Device disconnected (read stream ended)');
 				return;
@@ -422,19 +438,19 @@
 			const newData = decoder.decode(value);
 
 			// Add new data to buffer
-			readBuffer += newData;
+			serial_port_reader_buffer += newData;
 
 			// Process all complete JSON objects (separated by \r\n)
 			let startIndex = 0;
 			while (true) {
-				const endIndex = readBuffer.indexOf('\r\n', startIndex);
+				const endIndex = serial_port_reader_buffer.indexOf('\r\n', startIndex);
 				if (endIndex === -1) {
 					// No complete line found, keep remaining data in buffer
-					readBuffer = readBuffer.substring(startIndex);
+					serial_port_reader_buffer = serial_port_reader_buffer.substring(startIndex);
 					break;
 				}
 
-				const line = readBuffer.substring(startIndex, endIndex).trim();
+				const line = serial_port_reader_buffer.substring(startIndex, endIndex).trim();
 				if (line) {
 					logMessage('Received: ' + line);
 
@@ -463,7 +479,7 @@
 
 	// Handle automatic disconnection (when device is unplugged or connection lost)
 	async function handleDisconnection(reason) {
-		if (!isConnected) return; // Already disconnected
+		if (!serial_port_connected) return; // Already disconnected
 
 		logMessage('Connection lost: ' + reason);
 		continuousReadActive = false; // Stop continuous read loop
@@ -474,42 +490,42 @@
 				statusUpdateInterval = null;
 			}
 
-			if (reader) {
+			if (serial_port_reader) {
 				try {
-					await reader.cancel();
-					await reader.releaseLock();
+					await serial_port_reader.cancel();
+					await serial_port_reader.releaseLock();
 				} catch (e) {
 					// Reader may already be released
 				}
-				reader = null;
+				serial_port_reader = null;
 			}
 
-			if (writer) {
+			if (serial_port_writer) {
 				try {
-					await writer.releaseLock();
+					await serial_port_writer.releaseLock();
 				} catch (e) {
 					// Writer may already be released
 				}
-				writer = null;
+				serial_port_writer = null;
 			}
 
-			if (serialPort) {
+			if (serial_port) {
 				try {
-					await serialPort.close();
+					await serial_port.close();
 				} catch (e) {
 					// Port may already be closed
 				}
-				serialPort = null;
+				serial_port = null;
 			}
 
-			isConnected = false;
-			readBuffer = ''; // Clear the read buffer
+			serial_port_connected = false;
+			serial_port_reader_buffer = ''; // Clear the read buffer
 			updateConnectionStatus(false);
 			logMessage('Disconnected from device');
 		} catch (error) {
 			logMessage('Error during automatic disconnect: ' + error.message);
 			// Force update UI even if cleanup fails
-			isConnected = false;
+			serial_port_connected = false;
 			updateConnectionStatus(false);
 		}
 	}
@@ -519,7 +535,7 @@
 		continuousReadActive = true;
 
 		async function readLoop() {
-			while (continuousReadActive && isConnected && reader) {
+			while (continuousReadActive && serial_port_connected && serial_port_reader) {
 				try {
 					await readResponse();
 					// Small delay to prevent tight loop
@@ -621,10 +637,10 @@
 		}
 
 		statusUpdateInterval = setInterval(async () => {
-			if (isConnected) {
+			if (serial_port_connected) {
 				await sendCommand({ action: 'status_get' });
 			}
-		}, 1000); // Update every second
+		}, 500); // Update every 500ms
 	}
 
 	async function setTemperature(temp) {
