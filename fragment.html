@@ -317,6 +317,8 @@
 			sendCommand({ action: 'status_get' });
 			sendCommand({ action: 'firmware_version_get' });
 			sendCommand({ action: 'core_heating_temperature_target_get' });
+			sendCommand({ action: 'settings_user_get' });
+			sendCommand({ action: 'settings_product_get' });
 
 		} catch (error) {
 			logMessage('Connection failed: ' + error.message);
