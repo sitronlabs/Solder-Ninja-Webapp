@@ -122,12 +122,9 @@
 			<input type="range" id="tempSlider" min="0" max="400" value="300" step="5">
 			<input type="number" id="tempInput" min="0" max="400" value="300" step="5">
 			<span>°C</span>
-			<button id="getTempBtn" disabled>Get Measured Temperature</button>
 		</div>
 		<div class="controls">
-			<button id="standbyBtn" disabled>Standby (150°C)</button>
-			<button id="workBtn" disabled>Work (350°C)</button>
-			<button id="maxBtn" disabled>Max (400°C)</button>
+			<button id="maxBtn" disabled>Boost (400°C)</button>
 		</div>
 		<div class="controls">
 			<button id="lockBtn" disabled>Lock Device</button>
@@ -255,9 +252,6 @@
 				}, 500);
 			}
 		});
-		$('#getTempBtn').click(getMeasuredTemperature);
-		$('#standbyBtn').click(() => setQuickTemp(150));
-		$('#workBtn').click(() => setQuickTemp(350));
 		$('#maxBtn').click(() => setQuickTemp(400));
 		$('#lockBtn').click(lockDevice);
 		$('#unlockBtn').click(unlockDevice);
@@ -389,7 +383,7 @@
 	}
 
 	function enableControls(enabled) {
-		$('#getTempBtn, #standbyBtn, #workBtn, #maxBtn, #lockBtn, #unlockBtn, #saveSettingsBtn, #loadSettingsBtn, #resetSettingsBtn, #loadUserInfoBtn, #saveUserInfoBtn')
+		$('#maxBtn, #lockBtn, #unlockBtn, #saveSettingsBtn, #loadSettingsBtn, #resetSettingsBtn, #loadUserInfoBtn, #saveUserInfoBtn')
 			.prop('disabled', !enabled);
 	}
 
@@ -673,11 +667,6 @@
 			$('#tempInput').val(300);
 			$('#tempSlider').val(300);
 		}
-	}
-
-	async function getMeasuredTemperature() {
-		window.lastActionContext = 'measured';
-		await sendCommand({ action: 'core_heating_temperature_measured_get' });
 	}
 
 	async function lockDevice() {
