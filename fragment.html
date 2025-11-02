@@ -289,12 +289,12 @@
 
 			/* Request port with specific VID and PID filters */
 			serial_port = await navigator.serial.requestPort({
-				filters: [
-					{
-						usbVendorId: 0x2E8A,
-						usbProductId: 0x000A
-					}
-				]
+				// filters: [
+				// 	{
+				// 		usbVendorId: 0x2E8A,
+				// 		usbProductId: 0x000A
+				// 	}
+				// ]
 			});
 
 			/* Open the serial port */
