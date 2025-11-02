@@ -316,7 +316,7 @@
 			// Send initial status request and get firmware version
 			sendCommand({ action: 'status_get' });
 			sendCommand({ action: 'firmware_version_get' });
-			sendCommand({ action: 'core_heating_temperature_target_get' });
+			sendCommand({ action: 'controller_heating_temperature_target_get' });
 			sendCommand({ action: 'settings_user_get' });
 			sendCommand({ action: 'settings_product_get' });
 
@@ -651,14 +651,14 @@
 			temp = parseFloat($('#tempInput').val());
 		}
 		if (temp >= 0 && temp <= 400) {
-			await sendCommand({ action: 'core_heating_temperature_target_set', temperature_c: temp });
+			await sendCommand({ action: 'controller_heating_temperature_target_set', temperature_c: temp });
 		}
 	}
 
 	async function setQuickTemp(temp) {
 		$('#tempInput').val(temp);
 		$('#tempSlider').val(temp);
-		await sendCommand({ action: 'core_heating_temperature_target_set', temperature_c: temp });
+		await sendCommand({ action: 'controller_heating_temperature_target_set', temperature_c: temp });
 	}
 
 	async function saveSettings() {
@@ -667,32 +667,32 @@
 		// For now, just save the target temperature which is the main setting
 		const temp = parseFloat($('#tempInput').val());
 		if (temp >= 0 && temp <= 400) {
-			await sendCommand({ action: 'core_heating_temperature_target_set', temperature_c: temp });
+			await sendCommand({ action: 'controller_heating_temperature_target_set', temperature_c: temp });
 			logMessage('Settings saved (target temperature only - other settings not supported by firmware)');
 		}
 	}
 
 	async function loadSettings() {
 		// Load current target temperature
-		await sendCommand({ action: 'core_heating_temperature_target_get' });
+		await sendCommand({ action: 'controller_heating_temperature_target_get' });
 		// Also get product information if available
 		await sendCommand({ action: 'settings_product_get' });
 	}
 
 	async function resetSettings() {
 		if (confirm('Reset target temperature to default (300°C)?')) {
-			await sendCommand({ action: 'core_heating_temperature_target_set', temperature_c: 300 });
+			await sendCommand({ action: 'controller_heating_temperature_target_set', temperature_c: 300 });
 			$('#tempInput').val(300);
 			$('#tempSlider').val(300);
 		}
 	}
 
 	async function lockDevice() {
-		await sendCommand({ action: 'core_heating_lock' });
+		await sendCommand({ action: 'controller_heating_lock' });
 	}
 
 	async function unlockDevice() {
-		await sendCommand({ action: 'core_heating_unlock' });
+		await sendCommand({ action: 'controller_heating_unlock' });
 	}
 
 	function logMessage(message) {
