@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Solder Ninja Controller</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+	<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+	<style>
+		/* Mobile-first responsive styles */
+		.soldering-iron-app {
+			padding: 15px;
+		}
+
+		.soldering-iron-app h1 {
+			font-size: 1.75rem;
+			margin-bottom: 1rem;
+		}
+
+		.soldering-iron-app .accordion-button:disabled {
+			opacity: 0.6;
+			cursor: not-allowed;
+		}
+
+		/* Touch-friendly buttons on mobile */
+		@media (max-width: 576px) {
+			.soldering-iron-app .btn {
+				min-height: 44px;
+				font-size: 1rem;
+				padding: 0.5rem 1rem;
+			}
+
+			.soldering-iron-app .accordion-button {
+				padding: 1rem;
+				font-size: 1rem;
+			}
+		}
+
+		.soldering-iron-app .settings-grid {
+			display: grid;
+			grid-template-columns: 1fr;
+			gap: 20px;
+		}
+
+		@media (min-width: 768px) {
+			.soldering-iron-app .settings-grid {
+				grid-template-columns: 1fr 1fr;
+			}
+		}
+
+		.soldering-iron-app .setting-item {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 8px 0;
+			border-bottom: 1px solid #eee;
+		}
+
+		.soldering-iron-app .log {
+			background-color: #f8f9fa;
+			border: 1px solid #dee2e6;
+			border-radius: 4px;
+			padding: 10px;
+			height: 200px;
+			overflow-y: auto;
+			font-family: monospace;
+			font-size: 12px;
+		}
+
+		@media (max-width: 576px) {
+			.soldering-iron-app .log {
+				height: 150px;
+				font-size: 11px;
+			}
+		}
+
+		/* Icon editor - responsive sizing */
+		.soldering-iron-app .icon-pixel {
+			width: 12px;
+			height: 12px;
+			border: 1px solid #333;
+			display: inline-block;
+			cursor: pointer;
+			background-color: black;
+			padding: 0;
+			margin: 0;
+			box-sizing: border-box;
+			user-select: none;
+			-webkit-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			touch-action: none;
+		}
+
+		@media (max-width: 576px) {
+			.soldering-iron-app .icon-pixel {
+				width: 16px;
+				height: 16px;
+			}
+		}
+
+		.soldering-iron-app .icon-pixel.black {
+			background-color: white;
+		}
+
+		.soldering-iron-app .icon-pixel:hover {
+			border-color: #007bff;
+		}
+
+		.soldering-iron-app .icon-row {
+			display: block;
+			line-height: 0;
+		}
+
+		/* Temperature input - responsive */
+		@media (max-width: 576px) {
+			.soldering-iron-app #tempInput {
+				width: 80px !important;
+				font-size: 1rem;
+			}
+
+			.soldering-iron-app .form-range {
+				margin-bottom: 0.5rem;
+				height: 2rem;
+			}
+
+			.soldering-iron-app .d-flex.gap-2 {
+				flex-direction: column;
+			}
+
+			.soldering-iron-app .d-flex.gap-2 .btn {
+				width: 100%;
+			}
+
+			/* Better touch target for temperature slider/input container */
+			.soldering-iron-app .d-flex.align-items-center.gap-2 {
+				flex-wrap: wrap;
+			}
+
+			.soldering-iron-app .d-flex.align-items-center.gap-2 span {
+				align-self: center;
+			}
+		}
+
+		/* Progress bar - better visibility on mobile */
+		@media (max-width: 576px) {
+			.soldering-iron-app .progress {
+				height: 40px !important;
+			}
+
+			.soldering-iron-app .progress-bar {
+				font-size: 1rem;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+		}
+
+		/* Form controls - better spacing on mobile */
+		@media (max-width: 576px) {
+			.soldering-iron-app .form-label {
+				font-size: 0.95rem;
+				margin-bottom: 0.5rem;
+			}
+
+			.soldering-iron-app .form-control {
+				font-size: 1rem;
+				padding: 0.5rem;
+			}
+
+			.soldering-iron-app .mb-3 {
+				margin-bottom: 1rem !important;
+			}
+		}
+
+		/* Icon editor container - better mobile layout */
+		@media (max-width: 576px) {
+			.soldering-iron-app #iconEditor {
+				display: block;
+				margin: 0 auto;
+				width: fit-content;
+			}
+
+			.soldering-iron-app .mt-2 .btn {
+				width: 100%;
+				margin-bottom: 0.5rem;
+			}
+		}
+
+		/* Better spacing for device status on mobile */
+		@media (max-width: 576px) {
+			.soldering-iron-app #deviceStatus div {
+				margin-bottom: 0.5rem;
+				font-size: 0.95rem;
+			}
+		}
+
+		/* Accordion body padding on mobile */
+		@media (max-width: 576px) {
+			.soldering-iron-app .accordion-body {
+				padding: 1rem;
+			}
+		}
+	</style>
+</head>
+
+<body>
+	<!-- Soldering Iron Controller - Embeddable Version -->
+	<div class="soldering-iron-app">
+		<h1 class="mb-4">Solder Ninja Controller</h1>
+
+		<div class="accordion" id="mainAccordion">
+
+			<!-- Connection Panel -->
+			<div class="accordion-item">
+				<h2 class="accordion-header" id="connectionHeader">
+					<button class="accordion-button d-flex justify-content-between align-items-center" type="button"
+						data-bs-toggle="collapse" data-bs-target="#connectionCollapse" aria-expanded="true"
+						aria-controls="connectionCollapse">
+						<span>Connection</span>
+						<span id="connectionBadge" class="badge bg-secondary ms-auto">Disconnected</span>
+					</button>
+				</h2>
+				<div id="connectionCollapse" class="accordion-collapse collapse show" aria-labelledby="connectionHeader"
+					data-bs-parent="#mainAccordion">
+					<div class="accordion-body">
+						<div class="mb-3">
+							<div><strong>Product:</strong> <span id="productInfo">--</span></div>
+							<div><strong>Firmware Version:</strong> <span id="firmwareVersion">--</span></div>
+						</div>
+						<div class="d-grid gap-2 d-sm-flex justify-content-sm-start">
+							<button id="connectBtn" class="btn btn-primary">Connect to Device</button>
+							<button id="disconnectBtn" class="btn btn-outline-secondary" disabled>Disconnect</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Main UI Panel -->
+			<div class="accordion-item">
+				<h2 class="accordion-header" id="mainUIHeader">
+					<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+						data-bs-target="#mainUICollapse" aria-expanded="false" aria-controls="mainUICollapse"
+						id="mainUIHeaderBtn" disabled>
+						Temperature Control
+					</button>
+				</h2>
+				<div id="mainUICollapse" class="accordion-collapse collapse" aria-labelledby="mainUIHeader"
+					data-bs-parent="#mainAccordion">
+					<div class="accordion-body">
+						<div id="deviceStatus" class="mb-3">
+							<div><strong>Temperature:</strong> <span id="currentTemp">--</span>°C</div>
+							<div><strong>Target Temperature:</strong> <span id="targetTemp">--</span>°C</div>
+							<div><strong>Heating:</strong> <span id="heatingStatus">--</span></div>
+						</div>
+						<div class="mb-3">
+							<label class="form-label">Temperature (0-400°C)</label>
+							<div class="progress" style="height: 30px;">
+								<div id="tempProgressBar" class="progress-bar" role="progressbar" style="width: 0%;"
+									aria-valuenow="0" aria-valuemin="0" aria-valuemax="400">
+									<span id="tempProgressText">--</span>°C
+								</div>
+							</div>
+						</div>
+						<div class="mb-3">
+							<label for="tempSlider" class="form-label">Target Temperature:</label>
+							<div class="d-flex align-items-center gap-2">
+								<input type="range" class="form-range flex-grow-1" id="tempSlider" min="0" max="400"
+									value="300" step="5">
+								<input type="number" class="form-control" id="tempInput" min="0" max="400" value="300"
+									step="5" style="width: 100px;">
+								<span>°C</span>
+							</div>
+						</div>
+						<div class="d-flex gap-2 flex-wrap">
+							<button id="maxBtn" class="btn btn-outline-primary" disabled>Boost (400°C)</button>
+							<button id="startStopBtn" class="btn btn-outline-success" disabled>Start</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Preferences Panel -->
+			<div class="accordion-item">
+				<h2 class="accordion-header" id="preferencesHeader">
+					<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+						data-bs-target="#preferencesCollapse" aria-expanded="false" aria-controls="preferencesCollapse"
+						id="preferencesHeaderBtn" disabled>
+						Preferences
+					</button>
+				</h2>
+				<div id="preferencesCollapse" class="accordion-collapse collapse" aria-labelledby="preferencesHeader"
+					data-bs-parent="#mainAccordion">
+					<div class="accordion-body">
+						<div class="row">
+							<div class="col-md-6 mb-3">
+								<h3>Name</h3>
+								<div class="mb-2">
+									<label for="userNameLine1" class="form-label">Line 1 (max 12 chars):</label>
+									<input type="text" class="form-control" id="userNameLine1" maxlength="12"
+										placeholder="First line">
+								</div>
+								<div class="mb-2">
+									<label for="userNameLine2" class="form-label">Line 2 (max 12 chars):</label>
+									<input type="text" class="form-control" id="userNameLine2" maxlength="12"
+										placeholder="Second line">
+								</div>
+							</div>
+							<div class="col-md-6 mb-3">
+								<h3>Icon (16x16 bitmap)</h3>
+								<div id="iconEditor"
+									style="display: inline-block; border: 2px solid #333; padding: 5px; background: black; user-select: none;">
+									<!-- Icon grid will be generated here -->
+								</div>
+								<div class="mt-2">
+									<button id="clearIconBtn" class="btn btn-sm btn-outline-secondary"
+										type="button">Clear
+										Icon</button>
+									<button id="invertIconBtn" class="btn btn-sm btn-outline-secondary"
+										type="button">Invert
+										Icon</button>
+									<button id="loadImageBtn" class="btn btn-sm btn-outline-secondary"
+										type="button">Load
+										Image</button>
+									<input type="file" id="imageFileInput" accept="image/*" style="display: none;">
+								</div>
+							</div>
+						</div>
+						<div class="d-flex gap-2">
+							<button id="loadUserInfoBtn" class="btn btn-outline-primary" disabled>Load User
+								Info</button>
+							<button id="saveUserInfoBtn" class="btn btn-primary" disabled>Save User Info</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Communication Log Panel -->
+			<div class="accordion-item">
+				<h2 class="accordion-header" id="logHeader">
+					<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+						data-bs-target="#logCollapse" aria-expanded="false" aria-controls="logCollapse"
+						id="logHeaderBtn" disabled>
+						Communication Log
+					</button>
+				</h2>
+				<div id="logCollapse" class="accordion-collapse collapse" aria-labelledby="logHeader"
+					data-bs-parent="#mainAccordion">
+					<div class="accordion-body">
+						<div id="commLog" class="log"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<script>
+
+		/* Serial port variables */
+		let serial_port = null;
+		let serial_port_connected = false;
+		let serial_port_writer = null;
+		let serial_port_reader = null;
+		let serial_port_reader_buffer = ''; // Buffer for incomplete JSON responses
+
+		/* Icon editor variables */
+		let iconPixels = Array(16 * 16).fill(false); // 16x16 bitmap, false = inactive (black on OLED), true = active (white on OLED)
+		let isDragging = false; // Track if mouse is being dragged
+		let dragAction = null; // Track what action to perform during drag (true = set active/white, false = set inactive/black)
+
+		/* Other */
+		let statusUpdateInterval = null;
+		let temperatureUpdateTimeout = null; // Debounce timer for temperature updates
+		let continuousReadActive = false; // Track if continuous read loop is running
+		let currentTemperature = null;
+		let targetTemperature = null;
+		let isHeating = false;
+		let productInfo = '--';
+		let firmwareVersion = '--';
+
+		// Initialize the application
+		$(document).ready(function () {
+			initializeEventHandlers();
+			initializeIconEditor();
+			updateConnectionStatus(false);
+			updateTemperatureProgressBar(); // Initialize progress bar
+			updateStartStopButton(); // Initialize start/stop button
+			// Ensure other panels are disabled on initial load
+			$('#mainUIHeaderBtn, #preferencesHeaderBtn, #logHeaderBtn').prop('disabled', true);
+		});
+
+		function initializeEventHandlers() {
+			// Connection controls
+			$('#connectBtn').click(connectToDevice);
+			$('#disconnectBtn').click(disconnectFromDevice);
+
+			// Temperature controls
+			$('#tempSlider').on('input', function () {
+				const newValue = $(this).val();
+				$('#tempInput').val(newValue);
+				// Automatically send temperature when slider changes (debounced)
+				if (serial_port_connected) {
+					// Clear any pending temperature update
+					if (temperatureUpdateTimeout) {
+						clearTimeout(temperatureUpdateTimeout);
+					}
+					// Debounce: wait 300ms after user stops dragging before sending
+					temperatureUpdateTimeout = setTimeout(() => {
+						setTemperature(parseFloat(newValue));
+					}, 300);
+				}
+			});
+			$('#tempInput').on('input', function () {
+				const newValue = $(this).val();
+				$('#tempSlider').val(newValue);
+				// Automatically send temperature when input changes (debounced)
+				if (serial_port_connected) {
+					// Clear any pending temperature update
+					if (temperatureUpdateTimeout) {
+						clearTimeout(temperatureUpdateTimeout);
+					}
+					// Debounce: wait 500ms after user stops typing before sending
+					temperatureUpdateTimeout = setTimeout(() => {
+						setTemperature(parseFloat(newValue));
+					}, 500);
+				}
+			});
+			$('#maxBtn').click(() => setQuickTemp(400));
+			$('#startStopBtn').click(toggleStartStop);
+
+			// User info controls
+			$('#loadUserInfoBtn').click(loadUserInfo);
+			$('#saveUserInfoBtn').click(saveUserInfo);
+			$('#clearIconBtn').click(clearIcon);
+			$('#invertIconBtn').click(invertIcon);
+			$('#loadImageBtn').click(() => $('#imageFileInput').click());
+			$('#imageFileInput').change(handleImageLoad);
+		}
+
+		async function connectToDevice() {
+			try {
+
+				/* Check if the Web Serial API is supported */
+				if (!('serial' in navigator)) {
+					logMessage('Web Serial API not supported in this browser');
+					return;
+				}
+
+				/* Request port with specific VID and PID filters */
+				serial_port = await navigator.serial.requestPort({
+					filters: [
+						{
+							usbVendorId: 0x2E8A,
+							usbProductId: 0x000A
+						}
+					]
+				});
+
+				/* Open the serial port */
+				await serial_port.open({ baudRate: 115200 });
+
+				/* Get writer and reader for the serial port */
+				serial_port_writer = serial_port.writable.getWriter();
+				serial_port_reader = serial_port.readable.getReader();
+
+				/* Set connection status and start status updates and continuous read */
+				serial_port_connected = true;
+				updateConnectionStatus(true);
+				startStatusUpdates();
+				startContinuousRead();
+
+				logMessage('Connected to device');
+
+				// Send initial status request and get firmware version
+				sendCommand({ action: 'status_get' });
+				sendCommand({ action: 'firmware_version_get' });
+				sendCommand({ action: 'controller_heating_temperature_target_get' });
+				sendCommand({ action: 'settings_user_get' });
+				sendCommand({ action: 'settings_product_get' });
+
+			} catch (error) {
+				logMessage('Connection failed: ' + error.message);
+				updateConnectionStatus(false);
+			}
+		}
+
+		async function disconnectFromDevice() {
+
+			/* Skip if already disconnected */
+			if (!serial_port_connected) {
+				return;
+			}
+
+			try {
+				if (statusUpdateInterval) {
+					clearInterval(statusUpdateInterval);
+					statusUpdateInterval = null;
+				}
+
+				continuousReadActive = false; // Stop continuous read loop
+
+				if (serial_port_reader) {
+					try {
+						await serial_port_reader.cancel();
+						await serial_port_reader.releaseLock();
+					} catch (e) {
+						// Reader may already be released
+					}
+					serial_port_reader = null;
+				}
+
+				if (serial_port_writer) {
+					try {
+						await serial_port_writer.releaseLock();
+					} catch (e) {
+						// Writer may already be released
+					}
+					serial_port_writer = null;
+				}
+
+				if (serial_port) {
+					try {
+						await serial_port.close();
+					} catch (e) {
+						// Port may already be closed
+					}
+					serial_port = null;
+				}
+
+				serial_port_connected = false;
+				serial_port_reader_buffer = ''; // Clear the read buffer
+				updateConnectionStatus(false);
+				logMessage('Disconnected from device');
+
+			} catch (error) {
+				logMessage('Disconnect error: ' + error.message);
+				// Force update UI even if cleanup fails
+				serial_port_connected = false;
+				updateConnectionStatus(false);
+			}
+		}
+
+		function updateConnectionStatus(connected) {
+			const connectBtn = $('#connectBtn');
+			const disconnectBtn = $('#disconnectBtn');
+			const connectionBadge = $('#connectionBadge');
+			const connectionCollapseEl = document.getElementById('connectionCollapse');
+
+			// Accordion header buttons for other panels
+			const mainUIHeaderBtn = $('#mainUIHeaderBtn');
+			const preferencesHeaderBtn = $('#preferencesHeaderBtn');
+			const logHeaderBtn = $('#logHeaderBtn');
+
+			if (connected) {
+				connectBtn.prop('disabled', true);
+				disconnectBtn.prop('disabled', false);
+				enableControls(true);
+				// Collapse connection panel and update badge to green
+				const bsCollapse = bootstrap.Collapse.getInstance(connectionCollapseEl) || new bootstrap.Collapse(connectionCollapseEl, { toggle: false });
+				bsCollapse.hide();
+				connectionBadge.removeClass('bg-secondary').addClass('bg-success').text('Connected');
+				// Enable accordion buttons for other panels
+				mainUIHeaderBtn.prop('disabled', false);
+				preferencesHeaderBtn.prop('disabled', false);
+				logHeaderBtn.prop('disabled', false);
+			} else {
+				connectBtn.prop('disabled', false);
+				disconnectBtn.prop('disabled', true);
+				enableControls(false);
+				// Expand connection panel and update badge to red
+				const bsCollapse = bootstrap.Collapse.getInstance(connectionCollapseEl) || new bootstrap.Collapse(connectionCollapseEl, { toggle: false });
+				bsCollapse.show();
+				connectionBadge.removeClass('bg-success').addClass('bg-secondary').text('Disconnected');
+				// Disable and collapse other accordion panels
+				mainUIHeaderBtn.prop('disabled', true);
+				preferencesHeaderBtn.prop('disabled', true);
+				logHeaderBtn.prop('disabled', true);
+				// Force collapse other panels
+				const mainUICollapse = bootstrap.Collapse.getInstance(document.getElementById('mainUICollapse'));
+				const preferencesCollapse = bootstrap.Collapse.getInstance(document.getElementById('preferencesCollapse'));
+				const logCollapse = bootstrap.Collapse.getInstance(document.getElementById('logCollapse'));
+				if (mainUICollapse && mainUICollapse._isShown()) mainUICollapse.hide();
+				if (preferencesCollapse && preferencesCollapse._isShown()) preferencesCollapse.hide();
+				if (logCollapse && logCollapse._isShown()) logCollapse.hide();
+				// Reset temperature tracking and device state
+				currentTemperature = null;
+				targetTemperature = null;
+				isHeating = false;
+				deviceRunning = false;
+				updateTemperatureProgressBar();
+				updateStartStopButton();
+			}
+		}
+
+		function enableControls(enabled) {
+			$('#maxBtn, #startStopBtn, #loadUserInfoBtn, #saveUserInfoBtn')
+				.prop('disabled', !enabled);
+		}
+
+		async function sendCommand(command) {
+			if (!serial_port_connected || !serial_port_writer) {
+				logMessage('Not connected to device');
+				return;
+			}
+
+			try {
+				const commandStr = JSON.stringify(command) + '\r\n';
+				const encoder = new TextEncoder();
+				await serial_port_writer.write(encoder.encode(commandStr));
+				logMessage('Sent: ' + commandStr.trim());
+			} catch (error) {
+				logMessage('Send error: ' + error.message);
+				// Check if connection was lost
+				if (error.name === 'NetworkError' || error.name === 'InvalidStateError' ||
+					error.message.includes('closed') || error.message.includes('disconnected')) {
+					handleDisconnection('Device disconnected during send operation');
+				}
+			}
+		}
+
+		async function readResponse() {
+			if (!serial_port_reader) return;
+
+			try {
+				const { value, done } = await serial_port_reader.read();
+				if (done) {
+					handleDisconnection('Device disconnected (read stream ended)');
+					return;
+				}
+
+				const decoder = new TextDecoder();
+				const newData = decoder.decode(value);
+
+				// Add new data to buffer
+				serial_port_reader_buffer += newData;
+
+				// Process all complete JSON objects (separated by \r\n)
+				let startIndex = 0;
+				while (true) {
+					const endIndex = serial_port_reader_buffer.indexOf('\r\n', startIndex);
+					if (endIndex === -1) {
+						// No complete line found, keep remaining data in buffer
+						serial_port_reader_buffer = serial_port_reader_buffer.substring(startIndex);
+						break;
+					}
+
+					const line = serial_port_reader_buffer.substring(startIndex, endIndex).trim();
+					if (line) {
+						logMessage('Received: ' + line);
+
+						// Try to parse as JSON
+						try {
+							const data = JSON.parse(line);
+							handleResponse(data);
+						} catch (e) {
+							// Handle non-JSON responses
+							logMessage('Non-JSON response: ' + line);
+						}
+					}
+
+					startIndex = endIndex + 2; // Skip \r\n
+				}
+			} catch (error) {
+				logMessage('Read error: ' + error.message);
+				// Check if connection was lost
+				if (error.name === 'NetworkError' || error.name === 'InvalidStateError' ||
+					error.message.includes('closed') || error.message.includes('disconnected') ||
+					error.message.includes('The port has been closed')) {
+					handleDisconnection('Device disconnected during read operation');
+				}
+			}
+		}
+
+		// Handle automatic disconnection (when device is unplugged or connection lost)
+		async function handleDisconnection(reason) {
+			if (!serial_port_connected) return; // Already disconnected
+
+			logMessage('Connection lost: ' + reason);
+			continuousReadActive = false; // Stop continuous read loop
+
+			try {
+				if (statusUpdateInterval) {
+					clearInterval(statusUpdateInterval);
+					statusUpdateInterval = null;
+				}
+
+				if (serial_port_reader) {
+					try {
+						await serial_port_reader.cancel();
+						await serial_port_reader.releaseLock();
+					} catch (e) {
+						// Reader may already be released
+					}
+					serial_port_reader = null;
+				}
+
+				if (serial_port_writer) {
+					try {
+						await serial_port_writer.releaseLock();
+					} catch (e) {
+						// Writer may already be released
+					}
+					serial_port_writer = null;
+				}
+
+				if (serial_port) {
+					try {
+						await serial_port.close();
+					} catch (e) {
+						// Port may already be closed
+					}
+					serial_port = null;
+				}
+
+				serial_port_connected = false;
+				serial_port_reader_buffer = ''; // Clear the read buffer
+				updateConnectionStatus(false);
+				logMessage('Disconnected from device');
+			} catch (error) {
+				logMessage('Error during automatic disconnect: ' + error.message);
+				// Force update UI even if cleanup fails
+				serial_port_connected = false;
+				updateConnectionStatus(false);
+			}
+		}
+
+		// Start continuous read loop to detect disconnections
+		async function startContinuousRead() {
+			continuousReadActive = true;
+
+			async function readLoop() {
+				while (continuousReadActive && serial_port_connected && serial_port_reader) {
+					try {
+						await readResponse();
+						// Small delay to prevent tight loop
+						await new Promise(resolve => setTimeout(resolve, 10));
+					} catch (error) {
+						if (continuousReadActive) {
+							// Only handle if still supposed to be reading
+							if (error.name === 'NetworkError' || error.name === 'InvalidStateError' ||
+								error.message.includes('closed') || error.message.includes('disconnected') ||
+								error.message.includes('The port has been closed')) {
+								handleDisconnection('Device disconnected during read loop');
+								break;
+							}
+						}
+					}
+				}
+			}
+
+			readLoop();
+		}
+
+		function handleResponse(data) {
+			if (data.result === 'success') {
+				if (data.status) {
+					updateDeviceStatus(data.status);
+				}
+				if (data.settings) {
+					updateSettingsDisplay(data.settings);
+				}
+				// Handle temperature target get response
+				if (data.temperature_c !== undefined && !data.status) {
+					// Could be target or measured temperature response
+					// If we just requested measured temp, update current temp
+					// Otherwise assume it's target temp
+					const actionContext = window.lastActionContext || 'target';
+					if (actionContext === 'measured') {
+						currentTemperature = data.temperature_c;
+						$('#currentTemp').text(currentTemperature.toFixed(0));
+					} else {
+						targetTemperature = data.temperature_c;
+						$('#targetTemp').text(targetTemperature.toFixed(0));
+						$('#tempInput').val(Math.round(targetTemperature));
+						$('#tempSlider').val(Math.round(targetTemperature));
+					}
+					updateTemperatureProgressBar();
+					window.lastActionContext = null;
+				}
+				// Handle firmware version response
+				if (data.string !== undefined) {
+					firmwareVersion = data.string;
+					$('#firmwareVersion').text(firmwareVersion);
+					logMessage('Firmware version: ' + firmwareVersion);
+				}
+				// Handle product information response
+				if (data.number !== undefined) {
+					productInfo = data.number + ' (Rev: ' + data.revision + ', SN: ' + data.serial + ')';
+					$('#productInfo').text(productInfo);
+					logMessage('Product: ' + productInfo);
+				}
+				// Handle user information response
+				if (data.user !== undefined) {
+					if (data.user.name && Array.isArray(data.user.name)) {
+						$('#userNameLine1').val(data.user.name[0] || '');
+						$('#userNameLine2').val(data.user.name[1] || '');
+					}
+					if (data.user.icon && Array.isArray(data.user.icon)) {
+						// Convert 32-byte array to 16x16 bitmap
+						const iconBytes = data.user.icon.map(b => parseInt(b));
+						iconPixels = bytesToBitmap(iconBytes);
+						updateIconDisplay();
+					}
+				}
+			} else if (data.result === 'failure') {
+				if (data.errors && Array.isArray(data.errors)) {
+					data.errors.forEach(error => logMessage('Error: ' + error));
+				} else {
+					logMessage('Command failed');
+				}
+			}
+		}
+
+		function updateDeviceStatus(status) {
+			if (status.temperature && status.temperature.measured !== undefined) {
+				currentTemperature = status.temperature.measured;
+				$('#currentTemp').text(currentTemperature.toFixed(0));
+			}
+			if (status.temperature && status.temperature.target !== undefined) {
+				targetTemperature = status.temperature.target;
+				$('#targetTemp').text(targetTemperature.toFixed(0));
+			}
+			if (status.state !== undefined) {
+				// Map state to heating status
+				isHeating = status.state == '2';
+				$('#heatingStatus').text(isHeating ? 'Yes' : 'No');
+			}
+			// Update progress bar
+			updateTemperatureProgressBar();
+			// Note: power level not available in current firmware status response
+		}
+
+		function updateTemperatureProgressBar() {
+			const progressBar = $('#tempProgressBar');
+			const progressText = $('#tempProgressText');
+
+			if (currentTemperature === null || currentTemperature === undefined) {
+				progressBar.css('width', '0%');
+				progressText.text('--');
+				return;
+			}
+
+			// Calculate percentage (0-400°C scale)
+			const percentage = Math.min(Math.max((currentTemperature / 400) * 100, 0), 100);
+			progressBar.css('width', percentage + '%');
+			progressBar.attr('aria-valuenow', currentTemperature);
+			progressText.text(currentTemperature.toFixed(0));
+
+			// Remove all background color and animation classes first
+			progressBar.removeClass('bg-secondary bg-success bg-warning bg-danger bg-primary bg-info progress-bar-striped progress-bar-animated');
+
+			if (!isHeating) {
+				// Not heating: grey
+				progressBar.addClass('bg-secondary');
+				progressBar.removeClass('progress-bar-striped progress-bar-animated');
+			} else {
+				// Heating: animated striped bar
+				progressBar.addClass('progress-bar-striped progress-bar-animated');
+
+				// Check if within 10°C of target
+				if (targetTemperature !== null && targetTemperature !== undefined) {
+					const tempDiff = Math.abs(currentTemperature - targetTemperature);
+					if (tempDiff <= 10) {
+						// Within 10°C: green
+						progressBar.addClass('bg-success');
+					} else {
+						// More than 10°C away: orange
+						progressBar.addClass('bg-warning');
+					}
+				} else {
+					// No target temp available
+					progressBar.addClass('bg-secondary');
+				}
+			}
+		}
+
+		function updateSettingsDisplay(settings) {
+			if (settings.display_brightness !== undefined) {
+				$('#displayBrightness').val(settings.display_brightness);
+			}
+		}
+
+		function startStatusUpdates() {
+			if (statusUpdateInterval) {
+				clearInterval(statusUpdateInterval);
+			}
+
+			statusUpdateInterval = setInterval(async () => {
+				if (serial_port_connected) {
+					await sendCommand({ action: 'status_get' });
+				}
+			}, 500); // Update every 500ms
+		}
+
+		async function setTemperature(temp) {
+			// If no temp provided, get from input
+			if (temp === undefined) {
+				temp = parseFloat($('#tempInput').val());
+			}
+			if (temp >= 0 && temp <= 400) {
+				await sendCommand({ action: 'controller_heating_temperature_target_set', temperature_c: temp });
+			}
+		}
+
+		async function setQuickTemp(temp) {
+			$('#tempInput').val(temp);
+			$('#tempSlider').val(temp);
+			await sendCommand({ action: 'controller_heating_temperature_target_set', temperature_c: temp });
+		}
+
+		async function saveSettings() {
+			// Note: Firmware doesn't support bulk settings save
+			// Individual settings need to be saved separately
+			// For now, just save the target temperature which is the main setting
+			const temp = parseFloat($('#tempInput').val());
+			if (temp >= 0 && temp <= 400) {
+				await sendCommand({ action: 'controller_heating_temperature_target_set', temperature_c: temp });
+				logMessage('Settings saved (target temperature only - other settings not supported by firmware)');
+			}
+		}
+
+		async function loadSettings() {
+			// Load current target temperature
+			await sendCommand({ action: 'controller_heating_temperature_target_get' });
+			// Also get product information if available
+			await sendCommand({ action: 'settings_product_get' });
+		}
+
+		async function resetSettings() {
+			if (confirm('Reset target temperature to default (300°C)?')) {
+				await sendCommand({ action: 'controller_heating_temperature_target_set', temperature_c: 300 });
+				$('#tempInput').val(300);
+				$('#tempSlider').val(300);
+			}
+		}
+
+		let deviceRunning = false; // Track if device is running (unlocked/started)
+
+		async function toggleStartStop() {
+			if (deviceRunning) {
+				// Currently running, stop it (lock)
+				await sendCommand({ action: 'controller_heating_lock' });
+				deviceRunning = false;
+				updateStartStopButton();
+			} else {
+				// Currently stopped, start it (unlock)
+				await sendCommand({ action: 'controller_heating_unlock' });
+				deviceRunning = true;
+				updateStartStopButton();
+			}
+		}
+
+		function updateStartStopButton() {
+			const btn = $('#startStopBtn');
+			if (deviceRunning) {
+				btn.removeClass('btn-outline-success').addClass('btn-outline-danger').text('Stop');
+			} else {
+				btn.removeClass('btn-outline-danger').addClass('btn-outline-success').text('Start');
+			}
+		}
+
+		function logMessage(message) {
+			const timestamp = new Date().toLocaleTimeString();
+			$('#commLog').append(`[${timestamp}] ${message}<br/>`);
+			$('#commLog').scrollTop($('#commLog')[0].scrollHeight);
+		}
+
+		// Icon Editor Functions
+		function initializeIconEditor() {
+			const editor = $('#iconEditor');
+			editor.empty();
+			for (let row = 0; row < 16; row++) {
+				const rowDiv = $('<div class="icon-row"></div>');
+				for (let col = 0; col < 16; col++) {
+					const pixel = $('<div class="icon-pixel" data-row="' + row + '" data-col="' + col + '"></div>');
+
+					// Handle pixel interaction (mouse and touch)
+					function handlePixelStart(e) {
+						e.preventDefault();
+						const r = parseInt($(this).data('row'));
+						const c = parseInt($(this).data('col'));
+						const index = r * 16 + c;
+
+						// Determine action based on current pixel state
+						dragAction = !iconPixels[index];
+						isDragging = true;
+
+						// Set the initial pixel
+						iconPixels[index] = dragAction;
+						updateIconDisplay();
+					}
+
+					function handlePixelEnter(e) {
+						if (isDragging && dragAction !== null) {
+							e.preventDefault();
+							const r = parseInt($(this).data('row'));
+							const c = parseInt($(this).data('col'));
+							const index = r * 16 + c;
+							iconPixels[index] = dragAction;
+							updateIconDisplay();
+						}
+					}
+
+					// Mouse events
+					pixel.on('mousedown', handlePixelStart);
+					pixel.on('mouseenter', handlePixelEnter);
+
+					// Touch events for mobile
+					pixel.on('touchstart', handlePixelStart);
+					pixel.on('touchmove', function (e) {
+						if (isDragging) {
+							e.preventDefault();
+							// Find which pixel is being touched
+							const touch = e.touches[0] || e.changedTouches[0];
+							const element = document.elementFromPoint(touch.clientX, touch.clientY);
+							if (element && $(element).hasClass('icon-pixel')) {
+								const r = parseInt($(element).data('row'));
+								const c = parseInt($(element).data('col'));
+								const index = r * 16 + c;
+								if (dragAction !== null) {
+									iconPixels[index] = dragAction;
+									updateIconDisplay();
+								}
+							}
+						}
+					});
+
+					rowDiv.append(pixel);
+				}
+				editor.append(rowDiv);
+			}
+
+			// Stop dragging when mouse leaves the editor or mouse is released
+			editor.on('mouseleave', function () {
+				isDragging = false;
+				dragAction = null;
+			});
+
+			// Stop dragging on mouse up anywhere
+			$(document).on('mouseup', function () {
+				isDragging = false;
+				dragAction = null;
+			});
+
+			// Stop dragging on touch end (mobile)
+			$(document).on('touchend touchcancel', function () {
+				isDragging = false;
+				dragAction = null;
+			});
+
+			updateIconDisplay();
+		}
+
+		function updateIconDisplay() {
+			$('.icon-pixel').each(function () {
+				const row = parseInt($(this).data('row'));
+				const col = parseInt($(this).data('col'));
+				const index = row * 16 + col;
+				if (iconPixels[index]) {
+					$(this).addClass('black');
+				} else {
+					$(this).removeClass('black');
+				}
+			});
+		}
+
+		function clearIcon() {
+			iconPixels.fill(false);
+			updateIconDisplay();
+		}
+
+		function invertIcon() {
+			for (let i = 0; i < iconPixels.length; i++) {
+				iconPixels[i] = !iconPixels[i];
+			}
+			updateIconDisplay();
+		}
+
+		// Convert 32-byte array to 16x16 bitmap (bits)
+		function bytesToBitmap(bytes) {
+			const pixels = Array(16 * 16).fill(false);
+			for (let i = 0; i < 32; i++) {
+				const byte = bytes[i] || 0;
+				for (let bit = 0; bit < 8; bit++) {
+					const pixelIndex = i * 8 + bit;
+					if (pixelIndex < 256) {
+						pixels[pixelIndex] = (byte & (1 << (7 - bit))) !== 0;
+					}
+				}
+			}
+			return pixels;
+		}
+
+		// Convert 16x16 bitmap (bits) to 32-byte array
+		function bitmapToBytes(pixels) {
+			const bytes = Array(32).fill(0);
+			for (let i = 0; i < 32; i++) {
+				let byte = 0;
+				for (let bit = 0; bit < 8; bit++) {
+					const pixelIndex = i * 8 + bit;
+					if (pixelIndex < 256 && pixels[pixelIndex]) {
+						byte |= (1 << (7 - bit));
+					}
+				}
+				bytes[i] = byte;
+			}
+			return bytes;
+		}
+
+		async function loadUserInfo() {
+			await sendCommand({ action: 'settings_user_get' });
+		}
+
+		async function saveUserInfo() {
+			const line1 = $('#userNameLine1').val().trim();
+			const line2 = $('#userNameLine2').val().trim();
+
+			// Validate name lengths
+			if (line1.length === 0 || line2.length === 0) {
+				logMessage('Error: Both name lines must have at least 1 character');
+				return;
+			}
+			if (line1.length > 12 || line2.length > 12) {
+				logMessage('Error: Name lines must be 12 characters or less');
+				return;
+			}
+
+			// Convert icon bitmap to byte array
+			const iconBytes = bitmapToBytes(iconPixels);
+
+			// Send command
+			await sendCommand({
+				action: 'settings_user_set',
+				icon: iconBytes,
+				name: [line1, line2]
+			});
+		}
+
+		// Handle image loading and conversion to icon
+		async function handleImageLoad(event) {
+			const file = event.target.files[0];
+			if (!file) {
+				logMessage('No file selected');
+				return;
+			}
+
+			logMessage('Loading image: ' + file.name);
+
+			try {
+				// Load image
+				const image = await loadImageFromFile(file);
+				logMessage('Image loaded, processing...');
+
+				// Process image: resize to 16x16 and convert to black/white with threshold 128
+				const pixels = processImageToBitmap(image, 128);
+
+				// Update icon editor
+				iconPixels = pixels;
+				updateIconDisplay();
+
+				logMessage('Image converted to icon successfully');
+
+			} catch (error) {
+				logMessage('Error loading image: ' + error.message);
+				console.error('Image loading error:', error);
+			}
+
+			// Clear file input so same file can be selected again
+			event.target.value = '';
+		}
+
+		// Load image from file
+		function loadImageFromFile(file) {
+			return new Promise((resolve, reject) => {
+				const reader = new FileReader();
+				reader.onload = function (e) {
+					const img = new Image();
+					img.onload = () => resolve(img);
+					img.onerror = () => reject(new Error('Failed to load image'));
+					img.src = e.target.result;
+				};
+				reader.onerror = () => reject(new Error('Failed to read file'));
+				reader.readAsDataURL(file);
+			});
+		}
+
+		// Process image: resize to 16x16 and convert to black/white bitmap
+		function processImageToBitmap(image, threshold) {
+			try {
+				// Create a canvas for resizing and processing
+				const canvas = document.createElement('canvas');
+				canvas.width = 16;
+				canvas.height = 16;
+				const ctx = canvas.getContext('2d');
+
+				// Fill with white background first (handles transparent PNGs)
+				ctx.fillStyle = '#FFFFFF';
+				ctx.fillRect(0, 0, 16, 16);
+
+				// Use image smoothing for better quality when resizing
+				ctx.imageSmoothingEnabled = true;
+				ctx.imageSmoothingQuality = 'high';
+
+				// Draw image to canvas (resize to 16x16)
+				// This will composite transparent areas onto the white background
+				ctx.drawImage(image, 0, 0, 16, 16);
+
+				// Get image data
+				const imageData = ctx.getImageData(0, 0, 16, 16);
+				const data = imageData.data;
+
+				// Convert to bitmap (black/white based on threshold)
+				const pixels = [];
+				for (let i = 0; i < data.length; i += 4) {
+					// Get RGBA values
+					const r = data[i];
+					const g = data[i + 1];
+					const b = data[i + 2];
+					const a = data[i + 3]; // alpha channel
+
+					// If pixel is transparent or very transparent, make it white
+					if (a < 128) {
+						pixels.push(false); // white
+						continue;
+					}
+
+					// Convert RGB to grayscale using standard weights
+					const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+
+					// Apply threshold: if grayscale value is below threshold, make it black (true), otherwise white (false)
+					pixels.push(gray < threshold);
+				}
+
+				return pixels;
+			} catch (error) {
+				console.error('Error processing image:', error);
+				throw new Error('Failed to process image: ' + error.message);
+			}
+		}
+	</script>
+</body>
+
+</html>
