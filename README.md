@@ -1,4 +1,4 @@
-# Solder Ninja Pen Webapp
+# Solder Ninja Webapp
 
 Welcome to the Solder Ninja Pen web application!
 
