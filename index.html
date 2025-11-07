@@ -211,6 +211,11 @@
 	<div class="soldering-iron-app">
 		<h1 class="mb-4">Solder Ninja Controller</h1>
 
+		<!-- Mobile Warning Alert -->
+		<div class="alert alert-warning d-md-none" role="alert">
+			Not all mobile devices support the Web Serial API nor have the required usb drivers.
+			For the best experience, we recommend using this page on a desktop or laptop computer.
+		</div>
 		<div class="accordion" id="mainAccordion">
 
 			<!-- Connection Panel -->
@@ -220,7 +225,6 @@
 						data-bs-toggle="collapse" data-bs-target="#connectionCollapse" aria-expanded="true"
 						aria-controls="connectionCollapse">
 						<span>Connection</span>
-						<span id="connectionBadge" class="badge bg-secondary ms-auto">Disconnected</span>
 					</button>
 				</h2>
 				<div id="connectionCollapse" class="accordion-collapse collapse show" aria-labelledby="connectionHeader"
@@ -230,6 +234,7 @@
 							<div><strong>Product:</strong> <span id="productInfo">--</span></div>
 							<div><strong>Firmware Version:</strong> <span id="firmwareVersion">--</span></div>
 						</div>
+						<div id="firmwareUpdateAlert" class="mb-3"></div>
 						<div class="d-grid gap-2 d-sm-flex justify-content-sm-start">
 							<button id="connectBtn" class="btn btn-primary">Connect to Device</button>
 							<button id="disconnectBtn" class="btn btn-outline-secondary" disabled>Disconnect</button>
@@ -545,7 +550,6 @@
 		function updateConnectionStatus(connected) {
 			const connectBtn = $('#connectBtn');
 			const disconnectBtn = $('#disconnectBtn');
-			const connectionBadge = $('#connectionBadge');
 			const connectionCollapseEl = document.getElementById('connectionCollapse');
 
 			// Accordion header buttons for other panels
@@ -557,10 +561,9 @@
 				connectBtn.prop('disabled', true);
 				disconnectBtn.prop('disabled', false);
 				enableControls(true);
-				// Collapse connection panel and update badge to green
+				// Collapse connection panel
 				const bsCollapse = bootstrap.Collapse.getInstance(connectionCollapseEl) || new bootstrap.Collapse(connectionCollapseEl, { toggle: false });
 				bsCollapse.hide();
-				connectionBadge.removeClass('bg-secondary').addClass('bg-success').text('Connected');
 				// Enable accordion buttons for other panels
 				mainUIHeaderBtn.prop('disabled', false);
 				preferencesHeaderBtn.prop('disabled', false);
@@ -569,10 +572,9 @@
 				connectBtn.prop('disabled', false);
 				disconnectBtn.prop('disabled', true);
 				enableControls(false);
-				// Expand connection panel and update badge to red
+				// Expand connection panel
 				const bsCollapse = bootstrap.Collapse.getInstance(connectionCollapseEl) || new bootstrap.Collapse(connectionCollapseEl, { toggle: false });
 				bsCollapse.show();
-				connectionBadge.removeClass('bg-success').addClass('bg-secondary').text('Disconnected');
 				// Disable and collapse other accordion panels
 				mainUIHeaderBtn.prop('disabled', true);
 				preferencesHeaderBtn.prop('disabled', true);
@@ -591,6 +593,9 @@
 				deviceRunning = false;
 				updateTemperatureProgressBar();
 				updateStartStopButton();
+				// Clear firmware update alert
+				$('#firmwareUpdateAlert').empty();
+				latestFirmwareInfo = null;
 			}
 		}
 
@@ -784,6 +789,8 @@
 					firmwareVersion = data.string;
 					$('#firmwareVersion').text(firmwareVersion);
 					logMessage('Firmware version: ' + firmwareVersion);
+					// Automatically check for firmware updates after getting version
+					checkForFirmwareUpdates();
 				}
 				// Handle product information response
 				if (data.number !== undefined) {
@@ -824,7 +831,8 @@
 			}
 			if (status.state !== undefined) {
 				// Map state to heating status
-				isHeating = status.state == '2';
+				// State 2 = APP_STATE_ACTIVE (heating enabled)
+				isHeating = status.state === 2;
 				$('#heatingStatus').text(isHeating ? 'Yes' : 'No');
 			}
 			// Update progress bar
@@ -1237,6 +1245,345 @@
 			} catch (error) {
 				console.error('Error processing image:', error);
 				throw new Error('Failed to process image: ' + error.message);
+			}
+		}
+
+		// Firmware Update Functions
+		let latestFirmwareInfo = null; // Store latest firmware release info
+
+		// Parse semver version from firmware string
+		// Examples: "v0.0.0+20251102235110.gitd50b5d4.feature/com" or "slto00001-v0.0.0+20251107102638.git4df1602.unknown"
+		function parseFirmwareVersion(versionString) {
+			if (!versionString || versionString === '--') {
+				return null;
+			}
+
+			// Extract version part (x.y.z) - look for pattern like v0.0.0 or 0.0.0
+			const versionMatch = versionString.match(/v?(\d+)\.(\d+)\.(\d+)/);
+			if (!versionMatch) {
+				return null;
+			}
+
+			const major = parseInt(versionMatch[1], 10);
+			const minor = parseInt(versionMatch[2], 10);
+			const patch = parseInt(versionMatch[3], 10);
+
+			// Extract build timestamp (the part after +)
+			// Format: +20251102235110 (YYYYMMDDHHmmss)
+			const timestampMatch = versionString.match(/\+(\d{14})/);
+			let buildTimestamp = null;
+			if (timestampMatch) {
+				buildTimestamp = timestampMatch[1]; // Keep as string for comparison
+			}
+
+			return {
+				major,
+				minor,
+				patch,
+				buildTimestamp,
+				full: versionString
+			};
+		}
+
+		// Compare two firmware versions
+		// Returns: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
+		function compareFirmwareVersions(v1, v2) {
+			if (!v1 || !v2) return 0;
+
+			// First compare semver (x.y.z)
+			if (v1.major !== v2.major) {
+				return v1.major < v2.major ? -1 : 1;
+			}
+			if (v1.minor !== v2.minor) {
+				return v1.minor < v2.minor ? -1 : 1;
+			}
+			if (v1.patch !== v2.patch) {
+				return v1.patch < v2.patch ? -1 : 1;
+			}
+
+			// If semver is the same, compare build timestamps
+			if (v1.buildTimestamp && v2.buildTimestamp) {
+				if (v1.buildTimestamp < v2.buildTimestamp) {
+					return -1;
+				} else if (v1.buildTimestamp > v2.buildTimestamp) {
+					return 1;
+				}
+			} else if (v1.buildTimestamp && !v2.buildTimestamp) {
+				return 1; // v1 has timestamp, v2 doesn't
+			} else if (!v1.buildTimestamp && v2.buildTimestamp) {
+				return -1; // v2 has timestamp, v1 doesn't
+			}
+
+			return 0; // Same version
+		}
+
+		async function checkForFirmwareUpdates() {
+			const alertDiv = $('#firmwareUpdateAlert');
+
+			// Don't check if firmware version is not available
+			if (!firmwareVersion || firmwareVersion === '--') {
+				alertDiv.empty();
+				return;
+			}
+
+			// Show loading message
+			alertDiv.html(`
+				<div class="alert alert-info" role="alert">
+					Checking for firmware updates...
+				</div>
+			`);
+
+			try {
+				// GitHub API endpoint for releases
+				const apiUrl = 'https://api.github.com/repos/sitronlabs/Solder-Ninja-Pen-Firmware/releases/latest';
+
+				logMessage('Checking for firmware updates...');
+				const response = await fetch(apiUrl);
+
+				if (!response.ok) {
+					if (response.status === 404) {
+						logMessage('Firmware repository not found (404). Repository may be private or not exist.');
+						alertDiv.html(`
+							<div class="alert alert-warning alert-dismissible fade show" role="alert">
+								<strong>Unable to check for updates.</strong> Repository not found or is private.
+								<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+							</div>
+						`);
+						return;
+					}
+					if (response.status === 403) {
+						logMessage('Firmware update check rate limited (403). Please try again later.');
+						alertDiv.html(`
+							<div class="alert alert-warning alert-dismissible fade show" role="alert">
+								<strong>Update check rate limited.</strong> Please try again later.
+								<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+							</div>
+						`);
+						return;
+					}
+					throw new Error(`HTTP error! status: ${response.status}`);
+				}
+
+				const release = await response.json();
+
+				// Find the .uf2 file in the release assets
+				const uf2Asset = release.assets.find(asset => asset.name.endsWith('.uf2'));
+
+				if (!uf2Asset) {
+					logMessage('No .uf2 file found in release assets.');
+					alertDiv.html(`
+						<div class="alert alert-warning alert-dismissible fade show" role="alert">
+							<strong>No firmware file found</strong> in the latest release.
+							<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+						</div>
+					`);
+					return;
+				}
+
+				// Extract version from filename (remove .uf2 extension)
+				// Filename format might be: "slto00001-v0.0.0+20251107102638.git4df1602.unknown.uf2"
+				// or just: "v0.0.0+20251107102638.git4df1602.unknown.uf2"
+				const filenameWithoutExt = uf2Asset.name.replace(/\.uf2$/i, '');
+				// Try to extract version string from filename (look for pattern like v0.0.0+...)
+				// This regex matches: optional 'v', version numbers (x.y.z), then + or - followed by rest
+				const versionMatch = filenameWithoutExt.match(/(?:.*-)?(v?\d+\.\d+\.\d+[\+\-].*)/);
+				const releaseVersion = versionMatch ? versionMatch[1] : filenameWithoutExt;
+
+				logMessage('Latest release found: ' + release.tag_name + ' (version from filename: ' + releaseVersion + ')');
+
+				// Store firmware info for download
+				latestFirmwareInfo = {
+					version: releaseVersion,
+					uf2Url: uf2Asset.browser_download_url,
+					uf2Name: uf2Asset.name,
+					uf2Size: uf2Asset.size
+				};
+
+				// Parse versions
+				const currentVersion = parseFirmwareVersion(firmwareVersion);
+				const latestVersion = parseFirmwareVersion(releaseVersion);
+
+				if (!currentVersion || !latestVersion) {
+					logMessage('Unable to parse firmware versions. Current: ' + firmwareVersion + ', Latest: ' + releaseVersion);
+					alertDiv.html(`
+						<div class="alert alert-warning alert-dismissible fade show" role="alert">
+							<strong>Unable to compare versions.</strong> Current: ${firmwareVersion}, Latest: ${releaseVersion}
+							<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+						</div>
+					`);
+					return;
+				}
+
+				// Compare versions
+				const comparison = compareFirmwareVersions(currentVersion, latestVersion);
+
+				if (comparison < 0) {
+					// Current version is older - show update alert
+					logMessage('Firmware update available! Current: ' + firmwareVersion + ', Latest: ' + releaseVersion);
+					alertDiv.html(`
+						<div class="alert alert-warning alert-dismissible fade show" role="alert">
+							<strong>Firmware update available!</strong> Latest version: ${releaseVersion} (Current: ${firmwareVersion})
+							<button type="button" class="btn btn-sm btn-primary ms-2" onclick="updateFirmware()">Update Now</button>
+							<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+						</div>
+					`);
+				} else if (comparison === 0) {
+					// Versions are the same - show up to date alert
+					logMessage('Firmware is up to date: ' + firmwareVersion);
+					alertDiv.html(`
+						<div class="alert alert-success alert-dismissible fade show" role="alert">
+							<strong>Firmware is up to date.</strong> Version: ${firmwareVersion}
+							<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+						</div>
+					`);
+				} else {
+					// Current version is newer (shouldn't happen, but handle it)
+					logMessage('Current firmware is newer than latest release. Current: ' + firmwareVersion + ', Latest: ' + releaseVersion);
+					alertDiv.html(`
+						<div class="alert alert-info alert-dismissible fade show" role="alert">
+							<strong>Running development firmware.</strong> Current: ${firmwareVersion} (Latest release: ${releaseVersion})
+							<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+						</div>
+					`);
+				}
+
+			} catch (error) {
+				console.error('Error checking for firmware updates:', error);
+				logMessage('Error checking for firmware updates: ' + error.message);
+				alertDiv.html(`
+					<div class="alert alert-danger alert-dismissible fade show" role="alert">
+						<strong>Error checking for updates:</strong> ${error.message}
+						<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+					</div>
+				`);
+			}
+		}
+
+		// Make updateFirmware globally accessible for onclick handler
+		window.updateFirmware = async function updateFirmware() {
+			const alertDiv = $('#firmwareUpdateAlert');
+
+			// Check if firmware info is available and store it locally to prevent loss
+			if (!latestFirmwareInfo || !latestFirmwareInfo.uf2Url || !latestFirmwareInfo.uf2Name) {
+				logMessage('Error: No firmware update information available. Please check for updates first.');
+				alertDiv.html(`
+					<div class="alert alert-danger alert-dismissible fade show" role="alert">
+						<strong>Error:</strong> No firmware update information available. Please check for updates first.
+						<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+					</div>
+				`);
+				return;
+			}
+
+			// Store firmware info in local variables to prevent loss during async operations
+			const firmwareUrl = latestFirmwareInfo.uf2Url;
+			const firmwareName = latestFirmwareInfo.uf2Name;
+			const firmwareVersion = latestFirmwareInfo.version;
+
+			try {
+				alertDiv.html('<div class="alert alert-info">Preparing firmware update...</div>');
+
+				// If connected, trigger bootloader mode by reopening at 1200bps
+				if (serial_port_connected && serial_port) {
+					logMessage('Triggering bootloader mode...');
+					alertDiv.html('<div class="alert alert-info">Switching device to bootloader mode...</div>');
+
+					try {
+						// Close current connection cleanly
+						if (statusUpdateInterval) {
+							clearInterval(statusUpdateInterval);
+							statusUpdateInterval = null;
+						}
+						continuousReadActive = false;
+
+						if (serial_port_reader) {
+							try {
+								await serial_port_reader.cancel();
+								await serial_port_reader.releaseLock();
+							} catch (e) {
+								// Reader may already be released
+							}
+							serial_port_reader = null;
+						}
+
+						if (serial_port_writer) {
+							try {
+								await serial_port_writer.releaseLock();
+							} catch (e) {
+								// Writer may already be released
+							}
+							serial_port_writer = null;
+						}
+
+						if (serial_port) {
+							try {
+								await serial_port.close();
+							} catch (e) {
+								// Port may already be closed
+							}
+						}
+
+						serial_port_connected = false;
+						serial_port_reader_buffer = '';
+
+						// Wait a bit for the port to be fully released
+						await new Promise(resolve => setTimeout(resolve, 500));
+
+						// Reopen the port at 1200bps to trigger bootloader mode
+						// According to Arduino-Pico docs, opening at 1200bps triggers reset to bootloader
+						const bootloaderPort = await navigator.serial.requestPort({
+							filters: [
+								{
+									usbVendorId: 0x2E8A,
+									usbProductId: 0x000A
+								}
+							]
+						});
+
+						await bootloaderPort.open({ baudRate: 1200 });
+
+						// Close immediately - the act of opening at 1200bps triggers bootloader
+						await bootloaderPort.close();
+
+						logMessage('Device should now be in bootloader mode (MSC drive)');
+						alertDiv.html('<div class="alert alert-success">Device switched to bootloader mode. Please select the MSC drive when saving the firmware file.</div>');
+
+						// Wait a moment for the device to appear as MSC
+						await new Promise(resolve => setTimeout(resolve, 1000));
+
+					} catch (error) {
+						logMessage('Error triggering bootloader: ' + error.message);
+						// Continue anyway - user might manually put device in bootloader mode
+						alertDiv.html('<div class="alert alert-warning">Could not automatically trigger bootloader mode. Please manually put the device in bootloader mode, then download the firmware.</div>');
+					}
+				} else {
+					alertDiv.html('<div class="alert alert-info">Device not connected. Please connect the device first, or manually put it in bootloader mode.</div>');
+				}
+
+				// Download the firmware file (using local variables to prevent loss)
+				logMessage('Downloading firmware: ' + firmwareName);
+				alertDiv.html('<div class="alert alert-info">Downloading firmware file... Please select the MSC drive when saving.</div>');
+
+				// Create a direct download link to avoid CORS issues
+				// GitHub release assets can be downloaded directly via anchor tag
+				const a = document.createElement('a');
+				a.href = firmwareUrl;
+				a.download = firmwareName;
+				a.target = '_blank'; // Open in new tab as fallback
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+
+				logMessage('Firmware download started. Please save the file to the MSC drive.');
+				alertDiv.html(`<div class="alert alert-success">Firmware download started. Please save "${firmwareName}" to the MSC drive (RPI-RP2 or similar).</div>`);
+
+			} catch (error) {
+				console.error('Error updating firmware:', error);
+				logMessage('Error updating firmware: ' + error.message);
+				alertDiv.html(`<div class="alert alert-danger alert-dismissible fade show" role="alert">
+					<strong>Error updating firmware:</strong> ${error.message}
+					<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+				</div>`);
 			}
 		}
 	</script>
