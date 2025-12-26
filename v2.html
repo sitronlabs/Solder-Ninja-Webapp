@@ -1,0 +1,2032 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Solder Ninja Controller</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+	<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+	<style>
+		/* Mobile-first responsive styles */
+		.soldering-iron-app {
+			padding: 15px;
+		}
+
+		.soldering-iron-app h1 {
+			font-size: 1.75rem;
+			margin-bottom: 1rem;
+		}
+
+		/* Status bar - always visible at top */
+		.status-bar {
+			background-color: #f8f9fa;
+			border: 1px solid #dee2e6;
+			border-radius: 0.375rem;
+			padding: 0.75rem 1rem;
+			margin-bottom: 1rem;
+		}
+
+		.status-bar .status-item {
+			display: inline-block;
+			margin-right: 1.5rem;
+			font-size: 0.9rem;
+		}
+
+		.status-bar .status-item:last-child {
+			margin-right: 0;
+		}
+
+		.status-bar .status-label {
+			font-weight: 600;
+			color: #6c757d;
+		}
+
+		.status-bar .status-value {
+			color: #212529;
+		}
+
+		.status-bar .status-value.connected {
+			color: #198754;
+		}
+
+		.status-bar .status-value.disconnected {
+			color: #dc3545;
+		}
+
+		/* Web Serial availability callout */
+		.serial-availability-callout {
+			margin-bottom: 1rem;
+		}
+
+		/* Empty/disabled state */
+		.empty-state {
+			text-align: center;
+			padding: 3rem 1rem;
+			color: #6c757d;
+		}
+
+		.empty-state .empty-state-icon {
+			font-size: 3rem;
+			margin-bottom: 1rem;
+			opacity: 0.5;
+		}
+
+		/* Disabled controls overlay */
+		.control-disabled {
+			opacity: 0.5;
+			pointer-events: none;
+			position: relative;
+		}
+
+		.control-disabled::after {
+			content: attr(data-tooltip);
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			background: rgba(0, 0, 0, 0.8);
+			color: white;
+			padding: 0.5rem;
+			border-radius: 0.25rem;
+			font-size: 0.875rem;
+			white-space: nowrap;
+			z-index: 1000;
+			display: none;
+		}
+
+		/* Big toggle for Locked/Heating */
+		.heating-toggle-container {
+			margin: 1.5rem 0;
+		}
+
+		.heating-toggle {
+			width: 100%;
+			min-height: 80px;
+			font-size: 1.25rem;
+			font-weight: 600;
+			border-radius: 0.5rem;
+			border: 3px solid;
+			transition: all 0.3s ease;
+		}
+
+		.heating-toggle.locked {
+			background-color: #6c757d;
+			border-color: #495057;
+			color: white;
+		}
+
+		.heating-toggle.idle {
+			background-color: #ffc107;
+			border-color: #ffb300;
+			color: #000;
+		}
+
+		.heating-toggle.heating {
+			background-color: #0d6efd;
+			border-color: #0a58ca;
+			color: white;
+		}
+
+		.heating-toggle:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+
+		/* Temperature gauge */
+		.temp-gauge-container {
+			margin: 1.5rem 0;
+		}
+
+		.temp-gauge {
+			height: 50px;
+			font-size: 1.5rem;
+			font-weight: bold;
+		}
+
+		/* Preset buttons */
+		.preset-buttons {
+			display: flex;
+			gap: 0.5rem;
+			flex-wrap: wrap;
+			margin: 1rem 0;
+		}
+
+		.preset-buttons .btn {
+			flex: 1;
+			min-width: 80px;
+		}
+
+		.preset-buttons .btn.boost {
+			background-color: #dc3545;
+			border-color: #dc3545;
+			color: white;
+		}
+
+		.preset-buttons .btn.boost:hover:not(:disabled) {
+			background-color: #bb2d3b;
+			border-color: #b02a37;
+		}
+
+		/* Nudge buttons */
+		.nudge-buttons {
+			display: flex;
+			gap: 0.5rem;
+			margin: 0.5rem 0;
+		}
+
+		.nudge-buttons .btn {
+			flex: 1;
+		}
+
+		/* Touch-friendly buttons on mobile */
+		@media (max-width: 576px) {
+			.soldering-iron-app .btn {
+				min-height: 44px;
+				font-size: 1rem;
+				padding: 0.5rem 1rem;
+			}
+
+			.status-bar .status-item {
+				display: block;
+				margin-right: 0;
+				margin-bottom: 0.5rem;
+			}
+
+			.status-bar .status-item:last-child {
+				margin-bottom: 0;
+			}
+		}
+
+		.soldering-iron-app .log {
+			background-color: #f8f9fa;
+			border: 1px solid #dee2e6;
+			border-radius: 4px;
+			padding: 10px;
+			height: 200px;
+			overflow-y: auto;
+			font-family: monospace;
+			font-size: 12px;
+		}
+
+		@media (max-width: 576px) {
+			.soldering-iron-app .log {
+				height: 150px;
+				font-size: 11px;
+			}
+		}
+
+		/* Icon editor - responsive sizing */
+		.soldering-iron-app .icon-pixel {
+			width: 12px;
+			height: 12px;
+			border: 1px solid #333;
+			display: inline-block;
+			cursor: pointer;
+			background-color: black;
+			padding: 0;
+			margin: 0;
+			box-sizing: border-box;
+			user-select: none;
+			-webkit-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			touch-action: none;
+		}
+
+		@media (max-width: 576px) {
+			.soldering-iron-app .icon-pixel {
+				width: 16px;
+				height: 16px;
+			}
+		}
+
+		.soldering-iron-app .icon-pixel.black {
+			background-color: white;
+		}
+
+		.soldering-iron-app .icon-pixel:hover {
+			border-color: #007bff;
+		}
+
+		.soldering-iron-app .icon-row {
+			display: block;
+			line-height: 0;
+		}
+
+		/* Temperature input - responsive */
+		@media (max-width: 576px) {
+			.soldering-iron-app #tempInput {
+				width: 80px !important;
+				font-size: 1rem;
+			}
+
+			.soldering-iron-app .form-range {
+				margin-bottom: 0.5rem;
+				height: 2rem;
+			}
+		}
+
+		/* Progress bar - better visibility on mobile */
+		@media (max-width: 576px) {
+			.soldering-iron-app .progress {
+				height: 40px !important;
+			}
+
+			.soldering-iron-app .progress-bar {
+				font-size: 1rem;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+		}
+
+		/* Form validation */
+		.form-control.is-invalid {
+			border-color: #dc3545;
+		}
+
+		.invalid-feedback {
+			display: block;
+			width: 100%;
+			margin-top: 0.25rem;
+			font-size: 0.875rem;
+			color: #dc3545;
+		}
+
+		/* Firmware update stepper */
+		.firmware-stepper {
+			margin: 1.5rem 0;
+		}
+
+		.firmware-step {
+			padding: 1rem;
+			margin-bottom: 1rem;
+			border-left: 4px solid #dee2e6;
+			background-color: #f8f9fa;
+		}
+
+		.firmware-step.active {
+			border-left-color: #0d6efd;
+			background-color: #e7f1ff;
+		}
+
+		.firmware-step.completed {
+			border-left-color: #198754;
+			background-color: #d1e7dd;
+		}
+
+		/* Bootloader stepper */
+		.bootloader-stepper {
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: rgba(0, 0, 0, 0.8);
+			z-index: 9999;
+			display: none;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.bootloader-stepper.active {
+			display: flex;
+		}
+
+		.bootloader-stepper-content {
+			background: white;
+			border-radius: 0.5rem;
+			padding: 2rem;
+			max-width: 500px;
+			width: 90%;
+			max-height: 90vh;
+			overflow-y: auto;
+		}
+
+		/* Tab content */
+		.tab-content {
+			margin-top: 1rem;
+		}
+
+		.tab-pane {
+			min-height: 300px;
+		}
+	</style>
+</head>
+
+<body>
+	<!-- Soldering Iron Controller -->
+	<div class="soldering-iron-app">
+		<h1 class="mb-4">Solder Ninja Controller</h1>
+
+		<!-- Status Bar (always visible) -->
+		<div class="status-bar d-flex justify-content-between align-items-center flex-wrap">
+			<div class="d-flex flex-wrap align-items-center">
+				<div class="status-item">
+					<span class="status-label">Status:</span>
+					<span class="status-value disconnected" id="connectionStatusText">Not Connected</span>
+				</div>
+				<div class="status-item">
+					<span class="status-label">Product:</span>
+					<span class="status-value" id="product_info">--</span>
+				</div>
+				<div class="status-item">
+					<span class="status-label">Firmware:</span>
+					<span class="status-value" id="firmware_version">--</span>
+				</div>
+				<div class="status-item">
+					<span class="status-label">Temperature:</span>
+					<span class="status-value" id="currentTempStatus">--</span>°C
+				</div>
+			</div>
+			<div class="status-item">
+				<button id="disconnectBtn" class="btn btn-sm btn-outline-danger" style="display: none;">Disconnect</button>
+			</div>
+		</div>
+
+		<!-- Web Serial Availability Callout -->
+		<div id="serialAvailabilityCallout" class="serial-availability-callout" style="display: none;">
+			<div class="alert alert-warning" role="alert">
+				<strong>Web Serial not available</strong>
+				<p class="mb-0">This browser doesn't support the Web Serial API. Please use Chrome or Edge on desktop.
+				</p>
+				<a href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API" target="_blank" class="alert-link">Learn more</a>
+			</div>
+		</div>
+
+		<!-- Empty State (shown when not connected) -->
+		<div id="emptyState" class="empty-state">
+			<div class="empty-state-icon">🔌</div>
+			<h3>Not Connected</h3>
+			<p>Connect your Solder Ninja device to get started.</p>
+			<button id="connectBtnEmpty" class="btn btn-primary btn-lg">Connect to Device</button>
+		</div>
+
+		<!-- Main Content (hidden when not connected) -->
+		<div id="mainContent" style="display: none;">
+			<!-- Tabs -->
+			<ul class="nav nav-tabs" id="mainTabs" role="tablist">
+				<li class="nav-item" role="presentation">
+					<button class="nav-link active" id="live-tab" data-bs-toggle="tab" data-bs-target="#live" type="button" role="tab" aria-controls="live" aria-selected="true">Live</button>
+				</li>
+				<li class="nav-item" role="presentation">
+					<button class="nav-link" id="personalize-tab" data-bs-toggle="tab" data-bs-target="#personalize" type="button" role="tab" aria-controls="personalize" aria-selected="false">Personalize</button>
+				</li>
+				<li class="nav-item" role="presentation">
+					<button class="nav-link" id="updates-tab" data-bs-toggle="tab" data-bs-target="#updates" type="button" role="tab" aria-controls="updates" aria-selected="false">Updates & Logs</button>
+				</li>
+			</ul>
+
+			<div class="tab-content" id="mainTabContent">
+				<!-- Live Tab -->
+				<div class="tab-pane fade show active" id="live" role="tabpanel" aria-labelledby="live-tab">
+					<div class="mt-3">
+
+
+						<div class="section">
+							<div class="d-flex align-items-end justify-content-between">
+								<div>
+									<div class="temp-big" id="tempNow">--°</div>
+									<div class="temp-sub">Target <span id="tempTarget">--°C</span> · <span id="tempDelta">--</span></div>
+								</div>
+								<svg id="tempRing" width="96" height="96" viewBox="0 0 48 48" role="img" aria-label="Temperature ring">
+									<circle cx="24" cy="24" r="20" fill="none" stroke="#e5e7eb" stroke-width="6" />
+									<circle id="tempRingArc" cx="24" cy="24" r="20" fill="none" stroke="#0071e3" stroke-width="6" stroke-linecap="round" stroke-dasharray="125.6" stroke-dashoffset="125.6" transform="rotate(-90 24 24)" />
+								</svg>
+							</div>
+						</div>
+
+						<!-- Temperature Gauge -->
+						<div class="temp-gauge-container">
+							<label class="form-label">Current Temperature</label>
+							<div class="progress temp-gauge">
+								<div id="tempProgressBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="400">
+									<span id="tempProgressText">--°C</span>
+								</div>
+							</div>
+						</div>
+
+						<!-- Locked/Heating Toggle -->
+						<div class="heating-toggle-container">
+							<button id="heatingToggle" class="btn heating-toggle locked" disabled>
+								🔒 Locked
+							</button>
+						</div>
+
+						<!-- Target Temperature -->
+						<div class="mb-3">
+							<label for="tempSlider" class="form-label">Target Temperature</label>
+							<div class="d-flex align-items-center gap-2">
+								<input type="range" class="form-range flex-grow-1" id="tempSlider" min="0" max="400" value="300" step="5" disabled>
+								<input type="number" class="form-control" id="tempInput" min="0" max="400" value="300" step="5" style="width: 100px;" disabled>
+								<span>°C</span>
+							</div>
+						</div>
+
+						<!-- Preset Buttons -->
+						<div class="preset-buttons">
+							<button class="btn btn-outline-primary preset-btn" data-temp="250" disabled>250°C</button>
+							<button class="btn btn-outline-primary preset-btn" data-temp="300" disabled>300°C</button>
+							<button class="btn btn-outline-primary preset-btn" data-temp="350" disabled>350°C</button>
+							<button class="btn btn-outline-primary boost preset-btn" data-temp="400" disabled>400°C
+								(Boost)</button>
+						</div>
+
+						<!-- Nudge Buttons -->
+						<div class="nudge-buttons">
+							<button class="btn btn-outline-secondary nudge-btn" data-delta="-5" disabled>−5°C</button>
+							<button class="btn btn-outline-secondary nudge-btn" data-delta="5" disabled>+5°C</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Personalize Tab -->
+				<div class="tab-pane fade" id="personalize" role="tabpanel" aria-labelledby="personalize-tab">
+					<div class="mt-3">
+						<div class="row">
+							<div class="col-md-6 mb-3">
+								<h3>Name</h3>
+								<div class="mb-2">
+									<label for="userNameLine1" class="form-label">Line 1</label>
+									<input type="text" class="form-control" id="userNameLine1" maxlength="12" placeholder="First line" disabled>
+								</div>
+								<div class="mb-2">
+									<label for="userNameLine2" class="form-label">Line 2</label>
+									<input type="text" class="form-control" id="userNameLine2" maxlength="12" placeholder="Second line" disabled>
+								</div>
+							</div>
+							<div class="col-md-6 mb-3">
+								<h3>Icon (16x16 bitmap)</h3>
+								<div id="iconEditor" style="display: inline-block; border: 2px solid #333; padding: 5px; background: black; user-select: none;">
+									<!-- Icon grid will be generated here -->
+								</div>
+								<div class="mt-2">
+									<button id="icon_clearBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>Clear Icon</button>
+									<button id="icon_invertBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>Invert Icon</button>
+									<button id="loadImageBtn" class="btn btn-sm btn-outline-secondary" type="button" disabled>Load Image</button>
+									<input type="file" id="imageFileInput" accept="image/*" style="display: none;">
+								</div>
+							</div>
+						</div>
+						<div class="d-flex gap-2">
+							<button id="user_info_loadBtn" class="btn btn-outline-primary" disabled>Load User
+								Info</button>
+							<button id="user_info_saveBtn" class="btn btn-primary" disabled>Save User Info</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Updates & Logs Tab -->
+				<div class="tab-pane fade" id="updates" role="tabpanel" aria-labelledby="updates-tab">
+					<div class="mt-3">
+						<!-- Firmware Update Card -->
+						<div class="card mb-3">
+							<div class="card-header">
+								<h5 class="mb-0">Firmware Update</h5>
+							</div>
+							<div class="card-body">
+								<div id="firmwareUpdateCard">
+									<!-- Step 1: Current Version -->
+									<div class="firmware-step" id="firmwareStep1">
+										<strong>Step 1: Current Version</strong>
+										<div id="currentFirmwareInfo">Loading...</div>
+									</div>
+
+									<!-- Step 2: Latest Version -->
+									<div class="firmware-step" id="firmwareStep2">
+										<strong>Step 2: Latest Version</strong>
+										<div id="firmware_latest_info">Checking...</div>
+									</div>
+
+									<!-- Step 3: Update Actions -->
+									<div class="firmware-step" id="firmwareStep3">
+										<strong>Step 3: Update</strong>
+										<div id="firmwareUpdateActions">
+											<button id="bootloader_enterBtn" class="btn btn-primary" disabled>Enter
+												Bootloader</button>
+											<button id="uf2_downloadBtn" class="btn btn-outline-primary" disabled>Download UF2</button>
+											<button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#flashInstructions" aria-expanded="false" aria-controls="flashInstructions">How to
+												Flash</button>
+											<div class="collapse mt-2" id="flashInstructions">
+												<div class="card card-body">
+													<ol>
+														<li>Click "Enter Bootloader" to switch your device to bootloader mode</li>
+														<li>Your device will appear as a USB drive (RPI-RP2 or similar)</li>
+														<li>Click "Download UF2" to download the firmware file</li>
+														<li>Save the .uf2 file onto the USB drive</li>
+														<li>The device will automatically restart with the new firmware</li>
+													</ol>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- Communication Log -->
+						<div class="card">
+							<div class="card-header">
+								<h5 class="mb-0">Communication Log</h5>
+							</div>
+							<div class="card-body">
+								<div id="commLog" class="log"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Bootloader Stepper (blocking overlay) -->
+		<div id="bootloaderStepper" class="bootloader-stepper">
+			<div class="bootloader-stepper-content">
+				<h3>Entering Bootloader Mode</h3>
+				<div id="bootloaderSteps">
+					<div class="mb-3">
+						<p>Follow these steps:</p>
+						<ol>
+							<li>Your device will switch to bootloader mode</li>
+							<li>It will appear as a USB drive (RPI-RP2 or similar)</li>
+							<li>Download the firmware file using the button below</li>
+							<li>Drag and drop the .uf2 file onto the USB drive</li>
+							<li>Wait for the device to restart</li>
+						</ol>
+					</div>
+					<div class="d-grid gap-2">
+						<button id="bootloaderDownloadBtn" class="btn btn-primary" disabled>Download UF2 File</button>
+						<button id="bootloaderDoneBtn" class="btn btn-success" style="display: none;">Done Flashing?
+							Reconnect</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		/* Serial port variables */
+		let serial_port = null;
+		let serial_port_connected = false;
+		let serial_port_writer = null;
+		let serial_port_reader = null;
+		let serial_port_reader_buffer = '';
+		let serial_port_reconnect_attempts = 0;
+		let serial_port_max_reconnect_attempts = 5;
+		let serial_port_reconnect_timeout = null;
+
+		/* Command/Response mapping for promise-based communication */
+		// Removed - using strict request-response instead
+
+		/* Icon editor variables */
+		let icon_pixels = Array(16 * 16).fill(false);
+		let icon_drag_is_active = false;
+		let icon_drag_action = null;
+
+		/* State variables */
+		let status_update_interval = null;
+		let temperature_update_timeout = null;
+		let temperature_current = null;
+		let temperature_target = null;
+		let device_is_heating = false;
+		let device_is_locked = true; // Start locked
+		let device_state = 0; // 0 = locked, 1 = idle, 2 = active
+		let product_info = '--';
+		let firmware_version = '--';
+		let firmware_build_date = '--';
+		let firmware_latest_info = null;
+		let window_is_visible = true;
+		let status_polling_interval = 500; // Start with slower polling
+		let serial_port_manual_disconnect = false; // Track if user manually disconnected
+
+		// Initialize the application
+		$(document).ready(function () {
+			web_serial_support_check();
+			event_handlers_initialize();
+			icon_editor_initialize();
+			connection_status_update(false);
+			temperature_progress_bar_update();
+			heating_toggle_update();
+			window_visibility_handlers_setup();
+		});
+
+		function web_serial_support_check() {
+			if (!('serial' in navigator)) {
+				$('#serialAvailabilityCallout').show();
+				$('#connectBtnEmpty').prop('disabled', true);
+			}
+		}
+
+		function window_visibility_handlers_setup() {
+			document.addEventListener('visibilitychange', function () {
+				window_is_visible = !document.hidden;
+				if (serial_port_connected) {
+					if (window_is_visible) {
+						status_updates_start();
+					} else {
+						status_updates_stop();
+					}
+				}
+			});
+		}
+
+		function event_handlers_initialize() {
+			// Connection controls
+			$('#connectBtnEmpty').click(device_connect);
+			$('#disconnectBtn').click(device_disconnect);
+
+			// Heating toggle
+			$('#heatingToggle').click(heating_toggle);
+
+			// Temperature controls
+			$('#tempSlider').on('input', function () {
+				const newValue = $(this).val();
+				$('#tempInput').val(newValue);
+				if (serial_port_connected && !device_is_locked) {
+					if (temperature_update_timeout) {
+						clearTimeout(temperature_update_timeout);
+					}
+					temperature_update_timeout = setTimeout(() => {
+						temperature_set(parseFloat(newValue));
+					}, 300);
+				}
+			});
+			$('#tempInput').on('input', function () {
+				const newValue = $(this).val();
+				$('#tempSlider').val(newValue);
+				if (serial_port_connected && !device_is_locked) {
+					if (temperature_update_timeout) {
+						clearTimeout(temperature_update_timeout);
+					}
+					temperature_update_timeout = setTimeout(() => {
+						temperature_set(parseFloat(newValue));
+					}, 500);
+				}
+			});
+
+			// Preset buttons
+			$('.preset-btn').click(function () {
+				if (!device_is_locked) {
+					const temp = parseInt($(this).data('temp'));
+					temperature_quick_set(temp);
+				}
+			});
+
+			// Nudge buttons
+			$('.nudge-btn').click(function () {
+				if (!device_is_locked) {
+					const delta = parseInt($(this).data('delta'));
+					const current = parseFloat($('#tempInput').val());
+					const newTemp = Math.max(0, Math.min(400, current + delta));
+					temperature_quick_set(newTemp);
+				}
+			});
+
+			// User info controls
+			$('#user_info_loadBtn').click(user_info_load);
+			$('#user_info_saveBtn').click(user_info_save);
+			$('#icon_clearBtn').click(icon_clear);
+			$('#icon_invertBtn').click(icon_invert);
+			$('#loadImageBtn').click(() => $('#imageFileInput').click());
+			$('#imageFileInput').change(image_load_handle);
+
+			// Form validation
+			$('#userNameLine1, #userNameLine2').on('input', function () {
+				name_field_validate($(this));
+			});
+
+			// Firmware update
+			$('#bootloader_enterBtn').click(bootloader_enter);
+			$('#uf2_downloadBtn').click(uf2_download);
+			$('#bootloaderDownloadBtn').click(uf2_download);
+			$('#bootloaderDoneBtn').click(function () {
+				$('#bootloaderStepper').removeClass('active');
+				// Switch to Live tab
+				$('#live-tab').tab('show');
+				// Try to reconnect
+				setTimeout(() => {
+					device_connect();
+				}, 1000);
+			});
+		}
+
+		function name_field_validate($field) {
+			const value = $field.val().trim();
+			const maxLength = 12;
+			const $feedback = $field.next('.invalid-feedback');
+
+			if (value.length > maxLength) {
+				$field.addClass('is-invalid');
+				$feedback.text(`${maxLength} characters max`);
+				return false;
+			} else {
+				$field.removeClass('is-invalid');
+				$feedback.text('');
+				return true;
+			}
+		}
+
+		// Centralized command sending with strict request-response
+		async function command_send(command, timeout = 5000) {
+			if (!serial_port_connected || !serial_port_writer || !serial_port_reader) {
+				message_log('Not connected to device');
+				return Promise.reject(new Error('Not connected'));
+			}
+
+			try {
+				// Send command
+				const commandStr = JSON.stringify(command) + '\r\n';
+				const encoder = new TextEncoder();
+				await serial_port_writer.write(encoder.encode(commandStr));
+				message_log('Sent: ' + commandStr.trim());
+
+				// Read response immediately
+				const response = await response_read_with_timeout(timeout);
+				return response;
+			} catch (error) {
+				message_log('Command error: ' + error.message);
+				return Promise.reject(error);
+			}
+		}
+
+		async function device_connect() {
+			try {
+				if (!('serial' in navigator)) {
+					message_log('Web Serial API not supported in this browser');
+					return;
+				}
+
+				serial_port = await navigator.serial.requestPort({
+					filters: [
+						{
+							usbVendorId: 0x2E8A,
+							usbProductId: 0x000A
+						}
+					]
+				});
+
+				await serial_port.open({ baudRate: 115200 });
+
+				serial_port_writer = serial_port.writable.getWriter();
+				serial_port_reader = serial_port.readable.getReader();
+
+				serial_port_connected = true;
+				serial_port_reconnect_attempts = 0;
+				serial_port_manual_disconnect = false; // Reset manual disconnect flag
+				connection_status_update(true);
+				status_updates_start();
+
+				message_log('Connected to device');
+
+				// Send initial commands sequentially (strict request-response)
+				// Handle errors gracefully but continue with next command
+				try {
+					await status_get();
+				} catch (err) {
+					// Error already logged in status_get
+				}
+
+				try {
+					await firmware_version_get();
+				} catch (err) {
+					// Error already logged in firmware_version_get
+				}
+
+				try {
+					await controller_heating_temperature_target_get();
+				} catch (err) {
+					// Error already logged in controller_heating_temperature_target_get
+				}
+
+				try {
+					await settings_user_get();
+				} catch (err) {
+					// Error already logged in settings_user_get
+				}
+
+				try {
+					await settings_product_get();
+				} catch (err) {
+					// Error already logged in settings_product_get
+				}
+
+			} catch (error) {
+				message_log('Connection failed: ' + error.message);
+				connection_status_update(false);
+			}
+		}
+
+		async function device_disconnect() {
+			if (!serial_port_connected) {
+				return;
+			}
+
+			// Mark as manual disconnect to prevent auto-reconnect
+			serial_port_manual_disconnect = true;
+
+			// Clear any pending reconnect
+			if (serial_port_reconnect_timeout) {
+				clearTimeout(serial_port_reconnect_timeout);
+				serial_port_reconnect_timeout = null;
+			}
+
+			try {
+				status_updates_stop();
+
+				if (serial_port_reader) {
+					try {
+						await serial_port_reader.cancel();
+						await serial_port_reader.releaseLock();
+					} catch (e) { }
+					serial_port_reader = null;
+				}
+
+				if (serial_port_writer) {
+					try {
+						await serial_port_writer.releaseLock();
+					} catch (e) { }
+					serial_port_writer = null;
+				}
+
+				if (serial_port) {
+					try {
+						await serial_port.close();
+					} catch (e) { }
+					serial_port = null;
+				}
+
+				serial_port_connected = false;
+				serial_port_reader_buffer = '';
+				connection_status_update(false);
+				message_log('Disconnected from device');
+
+			} catch (error) {
+				message_log('Disconnect error: ' + error.message);
+				serial_port_connected = false;
+				connection_status_update(false);
+			}
+		}
+
+		function connection_status_update(connected) {
+			if (connected) {
+				$('#connectionStatusText').text('Connected').removeClass('disconnected').addClass('connected');
+				$('#disconnectBtn').show();
+				$('#emptyState').hide();
+				$('#mainContent').show();
+				controls_enable(true);
+			} else {
+				$('#connectionStatusText').text('Not Connected').removeClass('connected').addClass('disconnected');
+				$('#disconnectBtn').hide();
+				$('#emptyState').show();
+				$('#mainContent').hide();
+				controls_enable(false);
+				temperature_current = null;
+				temperature_target = null;
+				device_is_heating = false;
+				device_is_locked = true;
+				device_state = 0;
+				temperature_progress_bar_update();
+				heating_toggle_update();
+				// Reset firmware update card
+				$('#currentFirmwareInfo').text('Loading...');
+				$('#firmware_latest_info').text('Checking...');
+				$('#firmwareStep1, #firmwareStep2, #firmwareStep3').removeClass('active completed');
+				$('#bootloader_enterBtn, #uf2_downloadBtn').prop('disabled', true);
+				firmware_latest_info = null;
+			}
+		}
+
+		function controls_enable(enabled) {
+			const controls = [
+				'#heatingToggle', '#user_info_loadBtn',
+				'#user_info_saveBtn', '#icon_clearBtn', '#icon_invertBtn',
+				'#loadImageBtn', '#userNameLine1', '#userNameLine2',
+				'#bootloader_enterBtn', '#uf2_downloadBtn'
+			];
+
+			controls.forEach(selector => {
+				$(selector).prop('disabled', !enabled);
+			});
+
+			// Temperature controls depend on both connection and lock state
+			temperature_controls_update();
+
+			if (!enabled) {
+				$('#mainContent').addClass('control-disabled');
+			} else {
+				$('#mainContent').removeClass('control-disabled');
+			}
+		}
+
+		function temperature_controls_update() {
+			const enabled = serial_port_connected && !device_is_locked;
+			$('#tempSlider, #tempInput, .preset-btn, .nudge-btn').prop('disabled', !enabled);
+		}
+
+		async function response_read_with_timeout(timeout = 5000) {
+			if (!serial_port_reader) {
+				throw new Error('No reader available');
+			}
+
+			return new Promise((resolve, reject) => {
+				const timeoutId = setTimeout(() => {
+					reject(new Error(`Response timeout after ${timeout}ms`));
+				}, timeout);
+
+				async function read_loop() {
+					try {
+						while (true) {
+							const { value, done } = await serial_port_reader.read();
+							if (done) {
+								clearTimeout(timeoutId);
+								disconnection_handle('Device disconnected (read stream ended)');
+								reject(new Error('Device disconnected'));
+								return;
+							}
+
+							const decoder = new TextDecoder();
+							const newData = decoder.decode(value);
+							serial_port_reader_buffer += newData;
+
+							// Look for complete line
+							const endIndex = serial_port_reader_buffer.indexOf('\r\n');
+							if (endIndex !== -1) {
+								const line = serial_port_reader_buffer.substring(0, endIndex).trim();
+								serial_port_reader_buffer = serial_port_reader_buffer.substring(endIndex + 2);
+
+								if (line) {
+									message_log('Received: ' + line);
+									try {
+										const data = JSON.parse(line);
+										clearTimeout(timeoutId);
+										resolve(data);
+										return;
+									} catch (e) {
+										message_log('Non-JSON response: ' + line);
+										// Continue reading for next line
+									}
+								}
+							}
+						}
+					} catch (error) {
+						clearTimeout(timeoutId);
+						if (error.name === 'NetworkError' || error.name === 'InvalidStateError' ||
+							error.message.includes('closed') || error.message.includes('disconnected') ||
+							error.message.includes('The port has been closed')) {
+							disconnection_handle('Device disconnected during read operation');
+						}
+						reject(error);
+					}
+				}
+
+				read_loop();
+			});
+		}
+
+		async function disconnection_handle(reason) {
+			if (!serial_port_connected) return;
+
+			message_log('Connection lost: ' + reason);
+
+			try {
+				status_updates_stop();
+
+				if (serial_port_reader) {
+					try {
+						await serial_port_reader.cancel();
+						await serial_port_reader.releaseLock();
+					} catch (e) { }
+					serial_port_reader = null;
+				}
+
+				if (serial_port_writer) {
+					try {
+						await serial_port_writer.releaseLock();
+					} catch (e) { }
+					serial_port_writer = null;
+				}
+
+				if (serial_port) {
+					try {
+						await serial_port.close();
+					} catch (e) { }
+					serial_port = null;
+				}
+
+				serial_port_connected = false;
+				serial_port_reader_buffer = '';
+				connection_status_update(false);
+				message_log('Disconnected from device');
+
+				// Attempt auto-reconnect
+				reconnect_attempt();
+
+			} catch (error) {
+				message_log('Error during automatic disconnect: ' + error.message);
+				serial_port_connected = false;
+				connection_status_update(false);
+				reconnect_attempt();
+			}
+		}
+
+		async function reconnect_attempt() {
+			// Don't auto-reconnect if user manually disconnected
+			if (serial_port_manual_disconnect) {
+				message_log('Manual disconnect detected - auto-reconnect disabled');
+				return;
+			}
+
+			if (serial_port_reconnect_attempts >= serial_port_max_reconnect_attempts) {
+				message_log('Max reconnection attempts reached');
+				return;
+			}
+
+			serial_port_reconnect_attempts++;
+			const delay = Math.min(1000 * Math.pow(2, serial_port_reconnect_attempts - 1), 10000); // Exponential backoff, max 10s
+			message_log(`Attempting to reconnect in ${delay}ms... (attempt ${serial_port_reconnect_attempts}/${serial_port_max_reconnect_attempts})`);
+
+			serial_port_reconnect_timeout = setTimeout(async () => {
+				try {
+					await device_connect();
+				} catch (error) {
+					message_log('Reconnection attempt failed: ' + error.message);
+					reconnect_attempt();
+				}
+			}, delay);
+		}
+
+		// Removed continuous_read_start - using strict request-response instead
+
+		// Command functions - one per command in com.md
+		async function firmware_version_get() {
+			try {
+				const response = await command_send({ action: 'firmware_version_get' });
+				if (response && response.result === 'success' && response.string !== undefined) {
+					firmware_version = response.string;
+					$('#firmware_version').text(firmware_version);
+					firmware_step1_update();
+					firmware_updates_check();
+					return response;
+				} else if (response && response.result === 'failure') {
+					if (response.errors && Array.isArray(response.errors)) {
+						response.errors.forEach(error => message_log('Error: ' + error));
+					}
+				}
+			} catch (error) {
+				message_log('Firmware version get error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function settings_eeprom_dump() {
+			try {
+				const response = await command_send({ action: 'eeprom_dump' });
+				if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('EEPROM dump error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function settings_eeprom_read(address, length) {
+			try {
+				const response = await command_send({ action: 'eeprom_read', address: address, length: length });
+				if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('EEPROM read error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function settings_eeprom_write(address, data) {
+			try {
+				const response = await command_send({ action: 'eeprom_write', address: address, data: data });
+				if (response && response.result === 'success') {
+					message_log('EEPROM write successful');
+				} else if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('EEPROM write error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function settings_eeprom_wipe() {
+			try {
+				const response = await command_send({ action: 'eeprom_wipe' });
+				if (response && response.result === 'success') {
+					message_log('EEPROM wipe successful');
+				} else if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('EEPROM wipe error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function settings_product_get() {
+			try {
+				const response = await command_send({ action: 'product_information_get' });
+				if (response && response.result === 'success' && response.number !== undefined) {
+					product_info = response.number + ' (Rev: ' + response.revision + ', SN: ' + response.serial + ')';
+					$('#product_info').text(product_info);
+					return response;
+				} else if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('Product settings get error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function settings_product_set(number, revision, serial) {
+			try {
+				const response = await command_send({ action: 'product_information_set', number: number, revision: revision, serial: serial });
+				if (response && response.result === 'success') {
+					message_log('Product settings saved successfully');
+				} else if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('Product settings set error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function settings_user_get() {
+			try {
+				const response = await command_send({ action: 'user_information_get' });
+				if (response && response.result === 'success' && response.user !== undefined) {
+					if (response.user.name && Array.isArray(response.user.name)) {
+						$('#userNameLine1').val(response.user.name[0] || '');
+						$('#userNameLine2').val(response.user.name[1] || '');
+					}
+					if (response.user.icon && Array.isArray(response.user.icon)) {
+						const iconBytes = response.user.icon.map(b => parseInt(b));
+						icon_pixels = bitmap_from_bytes(iconBytes);
+						icon_display_update();
+					}
+					message_log('User info loaded successfully');
+					return response;
+				} else if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('User settings get error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function settings_user_set(icon, name) {
+			try {
+				const response = await command_send({ action: 'user_information_set', icon: icon, name: name });
+				if (response && response.result === 'success') {
+					message_log('User info saved successfully');
+				} else if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('User settings set error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function status_get() {
+			try {
+				const response = await command_send({ action: 'controller_status_get' });
+				if (response && response.result === 'success') {
+					device_status_update(response);
+					return response;
+				} else if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('Status get error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function controller_heating_temperature_target_get() {
+			try {
+				const response = await command_send({ action: 'controller_temperature_target_get' });
+				if (response && response.result === 'success' && response.temperature_c !== undefined) {
+					temperature_target = response.temperature_c;
+					$('#targetTemp').text(temperature_target.toFixed(0));
+					$('#tempInput').val(Math.round(temperature_target));
+					$('#tempSlider').val(Math.round(temperature_target));
+					temperature_progress_bar_update();
+					return response;
+				} else if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('Temperature target get error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function controller_heating_temperature_target_set(temperature_c) {
+			try {
+				const response = await command_send({ action: 'controller_temperature_target_set', temperature_c: temperature_c });
+				if (response && response.result === 'success') {
+					// Temperature will be updated on next status_get
+				} else if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('Temperature target set error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function controller_heating_temperature_measured_get() {
+			try {
+				const response = await command_send({ action: 'controller_temperature_measured_get' });
+				if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('Temperature measured get error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function controller_heating_lock() {
+			try {
+				const response = await command_send({ action: 'controller_lock' });
+				if (response && response.result === 'success') {
+					// Status will be updated on next status_get
+				} else if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('Heating lock error: ' + error.message);
+				throw error;
+			}
+		}
+
+		async function controller_heating_unlock() {
+			try {
+				const response = await command_send({ action: 'controller_unlock' });
+				if (response && response.result === 'success') {
+					// Status will be updated on next status_get
+				} else if (response && response.result === 'failure' && response.errors) {
+					response.errors.forEach(error => message_log('Error: ' + error));
+				}
+				return response;
+			} catch (error) {
+				message_log('Heating unlock error: ' + error.message);
+				throw error;
+			}
+		}
+
+		function device_status_update(status) {
+			if (status.temperature && status.temperature.measured !== undefined) {
+				temperature_current = status.temperature.measured;
+				$('#currentTempStatus').text(temperature_current.toFixed(0));
+			}
+			if (status.temperature && status.temperature.target !== undefined) {
+				temperature_target = status.temperature.target;
+			}
+			if (status.state !== undefined) {
+				// Handle string states from API: "locked", "idle"/"asleep", "active"
+				// Also support numeric states for backward compatibility: 0=locked, 1=idle, 2=active
+				let stateValue = status.state;
+				if (typeof stateValue === 'string') {
+					if (stateValue === 'locked') {
+						device_state = 0;
+					} else if (stateValue === 'idle' || stateValue === 'asleep') {
+						device_state = 1;
+					} else if (stateValue === 'active') {
+						device_state = 2;
+					} else {
+						// Unknown string state, default to locked
+						device_state = 0;
+					}
+				} else {
+					// Numeric state (backward compatibility)
+					device_state = stateValue;
+				}
+				device_is_locked = device_state === 0;
+				device_is_heating = device_state === 2;
+				heating_toggle_update();
+			}
+			temperature_progress_bar_update();
+			status_polling_interval_update();
+		}
+
+		function heating_toggle_update() {
+			const $toggle = $('#heatingToggle');
+			$toggle.removeClass('locked heating idle');
+			if (device_state === 0) {
+				// Locked
+				$toggle.addClass('locked').html('🔒 Locked');
+			} else if (device_state === 1) {
+				// Idle
+				$toggle.addClass('idle').html('😴 Idle');
+			} else if (device_state === 2) {
+				// Active/Heating
+				$toggle.addClass('heating').html('🔥 Heating');
+			}
+			temperature_controls_update();
+		}
+
+		function temperature_progress_bar_update() {
+			const progressBar = $('#tempProgressBar');
+			const progressText = $('#tempProgressText');
+
+			if (temperature_current === null || temperature_current === undefined) {
+				progressBar.css('width', '0%');
+				progressText.text('--°C');
+				return;
+			}
+
+			const percentage = Math.min(Math.max((temperature_current / 400) * 100, 0), 100);
+			progressBar.css('width', percentage + '%');
+			progressBar.attr('aria-valuenow', temperature_current);
+			progressText.text(temperature_current.toFixed(0) + '°C');
+
+			progressBar.removeClass('bg-secondary bg-success bg-warning bg-danger bg-primary bg-info progress-bar-striped progress-bar-animated');
+
+			if (!device_is_heating) {
+				progressBar.addClass('bg-secondary');
+			} else {
+				progressBar.addClass('progress-bar-striped progress-bar-animated');
+				if (temperature_target !== null && temperature_target !== undefined) {
+					const tempDiff = Math.abs(temperature_current - temperature_target);
+					if (tempDiff <= 10) {
+						progressBar.addClass('bg-success');
+					} else {
+						progressBar.addClass('bg-warning');
+					}
+				} else {
+					progressBar.addClass('bg-secondary');
+				}
+			}
+		}
+
+		function settings_display_update(settings) {
+			// Handle settings if needed
+		}
+
+		function status_updates_start() {
+			if (!window_is_visible) return;
+
+			status_updates_stop();
+			status_update_interval = setInterval(async () => {
+				if (serial_port_connected && window_is_visible) {
+					try {
+						await status_get();
+					} catch (error) {
+						// Error already logged in status_get
+					}
+				}
+			}, status_polling_interval);
+		}
+
+		function status_updates_stop() {
+			if (status_update_interval) {
+				clearInterval(status_update_interval);
+				status_update_interval = null;
+			}
+		}
+
+		function status_polling_interval_update() {
+			// Update polling interval based on state
+			if (device_is_heating) {
+				status_polling_interval = 100; // Fast polling when heating
+			} else {
+				status_polling_interval = 500; // Slower when locked/asleep
+			}
+
+			// Restart with new interval if already running
+			if (status_update_interval) {
+				status_updates_start();
+			}
+		}
+
+		async function heating_toggle() {
+			if (device_is_locked) {
+				// Unlock/Start heating
+				try {
+					await controller_heating_unlock();
+					// Get updated status
+					await status_get();
+				} catch (error) {
+					// Error already logged in controller_heating_unlock or status_get
+				}
+			} else {
+				// Lock/Stop heating
+				try {
+					await controller_heating_lock();
+					// Get updated status
+					await status_get();
+				} catch (error) {
+					// Error already logged in controller_heating_lock or status_get
+				}
+			}
+		}
+
+		async function temperature_set(temp) {
+			if (temp === undefined) {
+				temp = parseFloat($('#tempInput').val());
+			}
+			if (temp >= 0 && temp <= 400 && !device_is_locked) {
+				try {
+					await controller_heating_temperature_target_set(temp);
+				} catch (error) {
+					// Error already logged in controller_heating_temperature_target_set
+				}
+			}
+		}
+
+		async function temperature_quick_set(temp) {
+			$('#tempInput').val(temp);
+			$('#tempSlider').val(temp);
+			await temperature_set(temp);
+		}
+
+		function message_log(message) {
+			const timestamp = new Date().toLocaleTimeString();
+			const $log = $('#commLog');
+			const logElement = $log[0];
+
+			// Check if user is at the bottom (within 50px threshold) before appending
+			const isAtBottom = logElement.scrollHeight - logElement.scrollTop - logElement.clientHeight < 50;
+
+			// Append the new message
+			$log.append(`[${timestamp}] ${message}<br/>`);
+
+			// Only auto-scroll if user was already at the bottom
+			if (isAtBottom) {
+				// Use updated scrollHeight after appending
+				$log.scrollTop(logElement.scrollHeight);
+			}
+		}
+
+		// Icon Editor Functions
+		function icon_editor_initialize() {
+			const editor = $('#iconEditor');
+			editor.empty();
+			for (let row = 0; row < 16; row++) {
+				const rowDiv = $('<div class="icon-row"></div>');
+				for (let col = 0; col < 16; col++) {
+					const pixel = $('<div class="icon-pixel" data-row="' + row + '" data-col="' + col + '"></div>');
+
+					function pixel_start_handle(e) {
+						e.preventDefault();
+						const r = parseInt($(this).data('row'));
+						const c = parseInt($(this).data('col'));
+						const index = r * 16 + c;
+						icon_drag_action = !icon_pixels[index];
+						icon_drag_is_active = true;
+						icon_pixels[index] = icon_drag_action;
+						icon_display_update();
+					}
+
+					function pixel_enter_handle(e) {
+						if (icon_drag_is_active && icon_drag_action !== null) {
+							e.preventDefault();
+							const r = parseInt($(this).data('row'));
+							const c = parseInt($(this).data('col'));
+							const index = r * 16 + c;
+							icon_pixels[index] = icon_drag_action;
+							icon_display_update();
+						}
+					}
+
+					pixel.on('mousedown', pixel_start_handle);
+					pixel.on('mouseenter', pixel_enter_handle);
+
+					pixel.on('touchstart', pixel_start_handle);
+					pixel.on('touchmove', function (e) {
+						if (icon_drag_is_active) {
+							e.preventDefault();
+							const touch = e.touches[0] || e.changedTouches[0];
+							const element = document.elementFromPoint(touch.clientX, touch.clientY);
+							if (element && $(element).hasClass('icon-pixel')) {
+								const r = parseInt($(element).data('row'));
+								const c = parseInt($(element).data('col'));
+								const index = r * 16 + c;
+								if (icon_drag_action !== null) {
+									icon_pixels[index] = icon_drag_action;
+									icon_display_update();
+								}
+							}
+						}
+					});
+
+					rowDiv.append(pixel);
+				}
+				editor.append(rowDiv);
+			}
+
+			editor.on('mouseleave', function () {
+				icon_drag_is_active = false;
+				icon_drag_action = null;
+			});
+
+			$(document).on('mouseup', function () {
+				icon_drag_is_active = false;
+				icon_drag_action = null;
+			});
+
+			$(document).on('touchend touchcancel', function () {
+				icon_drag_is_active = false;
+				icon_drag_action = null;
+			});
+
+			icon_display_update();
+		}
+
+		function icon_display_update() {
+			$('.icon-pixel').each(function () {
+				const row = parseInt($(this).data('row'));
+				const col = parseInt($(this).data('col'));
+				const index = row * 16 + col;
+				if (icon_pixels[index]) {
+					$(this).addClass('black');
+				} else {
+					$(this).removeClass('black');
+				}
+			});
+		}
+
+		function icon_clear() {
+			icon_pixels.fill(false);
+			icon_display_update();
+		}
+
+		function icon_invert() {
+			for (let i = 0; i < icon_pixels.length; i++) {
+				icon_pixels[i] = !icon_pixels[i];
+			}
+			icon_display_update();
+		}
+
+		function bitmap_from_bytes(bytes) {
+			const pixels = Array(16 * 16).fill(false);
+			for (let i = 0; i < 32; i++) {
+				const byte = bytes[i] || 0;
+				for (let bit = 0; bit < 8; bit++) {
+					const pixelIndex = i * 8 + bit;
+					if (pixelIndex < 256) {
+						pixels[pixelIndex] = (byte & (1 << (7 - bit))) !== 0;
+					}
+				}
+			}
+			return pixels;
+		}
+
+		function bytes_from_bitmap(pixels) {
+			const bytes = Array(32).fill(0);
+			for (let i = 0; i < 32; i++) {
+				let byte = 0;
+				for (let bit = 0; bit < 8; bit++) {
+					const pixelIndex = i * 8 + bit;
+					if (pixelIndex < 256 && pixels[pixelIndex]) {
+						byte |= (1 << (7 - bit));
+					}
+				}
+				bytes[i] = byte;
+			}
+			return bytes;
+		}
+
+		async function user_info_load() {
+			try {
+				await settings_user_get();
+			} catch (error) {
+				// Error already logged in settings_user_get
+			}
+		}
+
+		async function user_info_save() {
+			const line1 = $('#userNameLine1').val().trim();
+			const line2 = $('#userNameLine2').val().trim();
+
+			if (!name_field_validate($('#userNameLine1')) || !name_field_validate($('#userNameLine2'))) {
+				message_log('Error: Please fix validation errors');
+				return;
+			}
+
+			if (line1.length === 0 || line2.length === 0) {
+				message_log('Error: Both name lines must have at least 1 character');
+				return;
+			}
+
+			const iconBytes = bytes_from_bitmap(icon_pixels);
+
+			try {
+				await settings_user_set(iconBytes, [line1, line2]);
+			} catch (error) {
+				// Error already logged in settings_user_set
+			}
+		}
+
+		async function image_load_handle(event) {
+			const file = event.target.files[0];
+			if (!file) {
+				message_log('No file selected');
+				return;
+			}
+
+			message_log('Loading image: ' + file.name);
+
+			try {
+				const image = await image_from_file_load(file);
+				message_log('Image loaded, processing...');
+				const pixels = bitmap_from_image_process(image, 128);
+				icon_pixels = pixels;
+				icon_display_update();
+				message_log('Image converted to icon successfully');
+			} catch (error) {
+				message_log('Error loading image: ' + error.message);
+				console.error('Image loading error:', error);
+			}
+
+			event.target.value = '';
+		}
+
+		function image_from_file_load(file) {
+			return new Promise((resolve, reject) => {
+				const reader = new FileReader();
+				reader.onload = function (e) {
+					const img = new Image();
+					img.onload = () => resolve(img);
+					img.onerror = () => reject(new Error('Failed to load image'));
+					img.src = e.target.result;
+				};
+				reader.onerror = () => reject(new Error('Failed to read file'));
+				reader.readAsDataURL(file);
+			});
+		}
+
+		function bitmap_from_image_process(image, threshold) {
+			try {
+				const canvas = document.createElement('canvas');
+				canvas.width = 16;
+				canvas.height = 16;
+				const ctx = canvas.getContext('2d');
+
+				ctx.fillStyle = '#FFFFFF';
+				ctx.fillRect(0, 0, 16, 16);
+
+				ctx.imageSmoothingEnabled = true;
+				ctx.imageSmoothingQuality = 'high';
+
+				ctx.drawImage(image, 0, 0, 16, 16);
+
+				const imageData = ctx.getImageData(0, 0, 16, 16);
+				const data = imageData.data;
+
+				const pixels = [];
+				for (let i = 0; i < data.length; i += 4) {
+					const r = data[i];
+					const g = data[i + 1];
+					const b = data[i + 2];
+					const a = data[i + 3];
+
+					if (a < 128) {
+						pixels.push(false);
+						continue;
+					}
+
+					const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+					pixels.push(gray < threshold);
+				}
+
+				return pixels;
+			} catch (error) {
+				console.error('Error processing image:', error);
+				throw new Error('Failed to process image: ' + error.message);
+			}
+		}
+
+		// Firmware Update Functions
+		function firmware_version_parse(versionString) {
+			if (!versionString || versionString === '--') {
+				return null;
+			}
+
+			const versionMatch = versionString.match(/v?(\d+)\.(\d+)\.(\d+)/);
+			if (!versionMatch) {
+				return null;
+			}
+
+			const major = parseInt(versionMatch[1], 10);
+			const minor = parseInt(versionMatch[2], 10);
+			const patch = parseInt(versionMatch[3], 10);
+
+			const timestampMatch = versionString.match(/\+(\d{14})/);
+			let buildTimestamp = null;
+			if (timestampMatch) {
+				buildTimestamp = timestampMatch[1];
+			}
+
+			// Extract build date if available
+			let buildDate = null;
+			if (buildTimestamp) {
+				const year = buildTimestamp.substring(0, 4);
+				const month = buildTimestamp.substring(4, 6);
+				const day = buildTimestamp.substring(6, 8);
+				const hour = buildTimestamp.substring(8, 10);
+				const minute = buildTimestamp.substring(10, 12);
+				buildDate = `${year}-${month}-${day} ${hour}:${minute}`;
+			}
+
+			return {
+				major,
+				minor,
+				patch,
+				buildTimestamp,
+				buildDate,
+				full: versionString
+			};
+		}
+
+		function firmware_versions_compare(v1, v2) {
+			if (!v1 || !v2) return 0;
+
+			if (v1.major !== v2.major) {
+				return v1.major < v2.major ? -1 : 1;
+			}
+			if (v1.minor !== v2.minor) {
+				return v1.minor < v2.minor ? -1 : 1;
+			}
+			if (v1.patch !== v2.patch) {
+				return v1.patch < v2.patch ? -1 : 1;
+			}
+
+			if (v1.buildTimestamp && v2.buildTimestamp) {
+				if (v1.buildTimestamp < v2.buildTimestamp) {
+					return -1;
+				} else if (v1.buildTimestamp > v2.buildTimestamp) {
+					return 1;
+				}
+			} else if (v1.buildTimestamp && !v2.buildTimestamp) {
+				return 1;
+			} else if (!v1.buildTimestamp && v2.buildTimestamp) {
+				return -1;
+			}
+
+			return 0;
+		}
+
+		function firmware_step1_update() {
+			const parsed = firmware_version_parse(firmware_version);
+			if (parsed) {
+				$('#currentFirmwareInfo').html(`
+					<div>Version: <strong>v${parsed.major}.${parsed.minor}.${parsed.patch}</strong></div>
+					${parsed.buildDate ? `<div>Build: <strong>${parsed.buildDate}</strong></div>` : ''}
+				`);
+				$('#firmwareStep1').addClass('completed');
+			} else {
+				$('#currentFirmwareInfo').text('Unable to parse version');
+			}
+		}
+
+		async function firmware_updates_check() {
+			if (!firmware_version || firmware_version === '--') {
+				return;
+			}
+
+			try {
+				const apiUrl = 'https://api.github.com/repos/sitronlabs/Solder-Ninja-Pen-Firmware/releases/latest';
+				message_log('Checking for firmware updates...');
+				const response = await fetch(apiUrl);
+
+				if (!response.ok) {
+					if (response.status === 404) {
+						$('#firmware_latest_info').html('<div class="text-warning">Repository not found or is private</div>');
+						return;
+					}
+					if (response.status === 403) {
+						$('#firmware_latest_info').html('<div class="text-warning">Rate limited. Please try again later.</div>');
+						return;
+					}
+					throw new Error(`HTTP error! status: ${response.status}`);
+				}
+
+				const release = await response.json();
+				const uf2Asset = release.assets.find(asset => asset.name.endsWith('.uf2'));
+
+				if (!uf2Asset) {
+					$('#firmware_latest_info').html('<div class="text-warning">No .uf2 file found in release</div>');
+					return;
+				}
+
+				const filenameWithoutExt = uf2Asset.name.replace(/\.uf2$/i, '');
+				const versionMatch = filenameWithoutExt.match(/(?:.*-)?(v?\d+\.\d+\.\d+[\+\-].*)/);
+				const releaseVersion = versionMatch ? versionMatch[1] : filenameWithoutExt;
+
+				firmware_latest_info = {
+					version: releaseVersion,
+					uf2Url: uf2Asset.browser_download_url,
+					uf2Name: uf2Asset.name,
+					uf2Size: uf2Asset.size,
+					releaseNotes: release.html_url
+				};
+
+				const currentVersion = firmware_version_parse(firmware_version);
+				const latestVersion = firmware_version_parse(releaseVersion);
+
+				if (!currentVersion || !latestVersion) {
+					$('#firmware_latest_info').html(`<div class="text-warning">Unable to compare versions</div>`);
+					return;
+				}
+
+				const comparison = firmware_versions_compare(currentVersion, latestVersion);
+				const parsedLatest = firmware_version_parse(releaseVersion);
+
+				if (comparison < 0) {
+					$('#firmware_latest_info').html(`
+						<div>Version: <strong>v${parsedLatest.major}.${parsedLatest.minor}.${parsedLatest.patch}</strong></div>
+						${parsedLatest.buildDate ? `<div>Build: <strong>${parsedLatest.buildDate}</strong></div>` : ''}
+						<div class="mt-2">
+							<a href="${release.html_url}" target="_blank" class="btn btn-sm btn-outline-primary">View Release Notes</a>
+						</div>
+					`);
+					$('#firmwareStep2').addClass('completed');
+					$('#firmwareStep3').addClass('active');
+					$('#bootloader_enterBtn, #uf2_downloadBtn').prop('disabled', false);
+				} else if (comparison === 0) {
+					$('#firmware_latest_info').html(`
+						<div>Version: <strong>v${parsedLatest.major}.${parsedLatest.minor}.${parsedLatest.patch}</strong> (up to date)</div>
+						${parsedLatest.buildDate ? `<div>Build: <strong>${parsedLatest.buildDate}</strong></div>` : ''}
+					`);
+					$('#firmwareStep2').addClass('completed');
+					$('#firmwareStep3').addClass('completed');
+				} else {
+					$('#firmware_latest_info').html(`
+						<div>Version: <strong>v${parsedLatest.major}.${parsedLatest.minor}.${parsedLatest.patch}</strong> (running development version)</div>
+					`);
+					$('#firmwareStep2').addClass('completed');
+					$('#firmwareStep3').addClass('completed');
+				}
+
+			} catch (error) {
+				console.error('Error checking for firmware updates:', error);
+				message_log('Error checking for firmware updates: ' + error.message);
+				$('#firmware_latest_info').html(`<div class="text-danger">Error: ${error.message}</div>`);
+			}
+		}
+
+		async function bootloader_enter() {
+			if (!serial_port_connected || !serial_port) {
+				message_log('Device not connected');
+				return;
+			}
+
+			$('#bootloaderStepper').addClass('active');
+			$('#bootloaderDownloadBtn').prop('disabled', true);
+			$('#bootloaderDoneBtn').hide();
+
+			try {
+				message_log('Triggering bootloader mode...');
+
+				// Prevent auto-reconnect from interfering
+				serial_port_manual_disconnect = true;
+				if (serial_port_reconnect_timeout) {
+					clearTimeout(serial_port_reconnect_timeout);
+					serial_port_reconnect_timeout = null;
+				}
+				serial_port_reconnect_attempts = 0;
+
+				status_updates_stop();
+
+				if (serial_port_reader) {
+					try {
+						await serial_port_reader.cancel();
+						await serial_port_reader.releaseLock();
+					} catch (e) { }
+					serial_port_reader = null;
+				}
+
+				if (serial_port_writer) {
+					try {
+						await serial_port_writer.releaseLock();
+					} catch (e) { }
+					serial_port_writer = null;
+				}
+
+				if (serial_port) {
+					try {
+						await serial_port.close();
+					} catch (e) { }
+					serial_port = null;
+				}
+
+				serial_port_connected = false;
+				serial_port_reader_buffer = '';
+				connection_status_update(false);
+
+				await new Promise(resolve => setTimeout(resolve, 500));
+
+				const bootloaderPort = await navigator.serial.requestPort({
+					filters: [
+						{
+							usbVendorId: 0x2E8A,
+							usbProductId: 0x000A
+						}
+					]
+				});
+
+				await bootloaderPort.open({ baudRate: 1200 });
+				await bootloaderPort.close();
+
+				message_log('Device should now be in bootloader mode');
+				$('#bootloaderDownloadBtn').prop('disabled', false);
+				$('#bootloaderDoneBtn').show();
+
+				await new Promise(resolve => setTimeout(resolve, 1000));
+
+			} catch (error) {
+				message_log('Error triggering bootloader: ' + error.message);
+				$('#bootloaderDownloadBtn').prop('disabled', false);
+			}
+		}
+
+		function uf2_download() {
+			if (!firmware_latest_info || !firmware_latest_info.uf2Url) {
+				message_log('No firmware file available');
+				return;
+			}
+
+			const a = document.createElement('a');
+			a.href = firmware_latest_info.uf2Url;
+			a.download = firmware_latest_info.uf2Name;
+			a.target = '_blank';
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+
+			message_log('Firmware download started');
+		}
+	</script>
+</body>
+
+</html>
+
+</html>
