@@ -6,6 +6,9 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="robots" content="noindex">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
 	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 	<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
 	<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -22,6 +25,38 @@
 			height: 5px;
 		}
 
+		.navbar {
+			background-color: #FCE477;
+			box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+			padding: 16px 0 8px;
+		}
+
+		.navbar .navbar-brand {
+			color: #212529;
+			font-family: "Bebas Neue", "Odoo Unicode Support Noto", sans-serif;
+			font-size: 26.6667px;
+			font-weight: 400;
+			line-height: 40px;
+			padding-bottom: 3.75px;
+			padding-top: 3.75px;
+		}
+
+		.navbar .nav-link {
+			color: rgba(0, 0, 0, 0.65);
+			font-family: "Bebas Neue", "Odoo Unicode Support Noto", sans-serif;
+			font-size: 1.3125rem;
+		}
+
+		.navbar .nav-link.active {
+			color: rgb(0, 0, 0);
+		}
+
+		h1 {
+			font-size: 3.875rem;
+			color: #212529;
+			font-family: "Bebas Neue", "Odoo Unicode Support Noto", sans-serif;
+		}
+
 		.card-header .nav-link {
 			color: rgb(0, 0, 0);
 		}
@@ -29,6 +64,55 @@
 </head>
 
 <body>
+	<!-- Bootstrap Header/Navbar -->
+	<nav class="navbar navbar-expand-lg pt-3 shadow-sm">
+		<div class="container flex-wrap">
+			<div class="d-grid align-items-center w-100 pb-3">
+				<a href="https://www.solder.ninja/" class="navbar-brand mx-auto mw-100"><span
+						style="font-size: 1.9375rem;">Solder&nbsp;Ninja</span></a>
+			</div>
+			<div class="d-flex justify-content-center w-100">
+				<ul role="menu" id="top_menu" class="nav navbar-nav top_menu pb-0">
+					<li role="presentation" class="nav-item">
+						<a role="menuitem" href="https://www.solder.ninja/" class="nav-link ">
+							<span>Home</span>
+						</a>
+					</li>
+					<li role="presentation" class="nav-item">
+						<a role="menuitem" href="https://www.solder.ninja/pen" class="nav-link">
+							<span>Pen</span>
+						</a>
+					</li>
+					<li role="presentation" class="nav-item">
+						<a role="menuitem" href="https://www.solder.ninja/tweezers" class="nav-link">
+							<span>Tweezers</span>
+						</a>
+					</li>
+					<li role="presentation" class="nav-item">
+						<a role="menuitem" href="https://www.solder.ninja/station" class="nav-link">
+							<span>Station</span>
+						</a>
+					</li>
+					<li role="presentation" class="nav-item">
+						<a role="menuitem" href="https://www.solder.ninja/blog/news-6" class="nav-link">
+							<span>News</span>
+						</a>
+					</li>
+					<li role="presentation" class="nav-item ">
+						<a role="menuitem" href="https://sitronlabs.github.io/Solder-Ninja-Webapp/"
+							class="nav-link active">
+							<span>App</span>
+						</a>
+					</li>
+				</ul>
+			</div>
+		</div>
+	</nav>
+
+	<div class="container py-5">
+		<h1 style="text-align: center;">Solder Ninja Webapp</h1>
+	</div>
+
 	<div id="root"></div>
 
 	<script type="text/babel">
