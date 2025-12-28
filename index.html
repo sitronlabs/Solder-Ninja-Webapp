@@ -21,6 +21,10 @@
 			width: 5px;
 			height: 5px;
 		}
+
+		.card-header .nav-link {
+			color: rgb(0, 0, 0);
+		}
 	</style>
 </head>
 
@@ -1261,7 +1265,7 @@
 								<i className="bi bi-motherboard"></i> <strong>Local version:</strong>
 							</label>
 						</div>
-						<div className="col">{device.firmwareVersion || '--'}</div>
+						<div className="col-9">{device.firmwareVersion || '--'}</div>
 					</div>
 					{latestFirmware && (
 						<div className="row">
@@ -1335,7 +1339,7 @@
 			if (!device) {
 				if (!deviceManager) return null;
 				return (
-					<div className="card shadow-sm" style={{ maxWidth: '40rem' }}>
+					<div className="card shadow-sm mx-auto" style={{ maxWidth: '40rem' }}>
 						<div className="card-header">
 							<button
 								type="button"
@@ -1359,7 +1363,7 @@
 
 			if (device.state === DeviceState.PROBING) {
 				return (
-					<div className="card shadow-sm" style={{ maxWidth: '40rem' }}>
+					<div className="card shadow-sm mx-auto" style={{ maxWidth: '40rem' }}>
 						<div className="card-header">
 							<div className="row">
 								<div className="col-auto">
@@ -1384,8 +1388,6 @@
 				);
 			}
 
-
-
 			if (device.state === DeviceState.DISCONNECTED || device.state === DeviceState.BOOTLOADER) {
 				// Only show as Solder Ninja Pen if we have confirmed product info
 				const isSolderNinjaPen = device.productInfo && device.productInfo.number === 'SLTO00001';
@@ -1402,7 +1404,7 @@
 				);
 
 				return (
-					<div className="card shadow-sm" style={{ maxWidth: '40rem' }}>
+					<div className="card shadow-sm mx-auto" style={{ maxWidth: '40rem' }}>
 						<div className="card-header">
 							<div className="row">
 								<div className="col-auto">
@@ -1457,7 +1459,7 @@
 				const userName = (device.userInfo?.name?.[0] && !isFirstTimeName) ? ` of ${device.userInfo.name[0]}` : '';
 
 				return (
-					<div className="card shadow-sm" style={{ maxWidth: '40rem' }}>
+					<div className="card shadow-sm mx-auto" style={{ maxWidth: '40rem' }}>
 						<div className="card-header">
 							<div className="row">
 								<div className="col-auto">
