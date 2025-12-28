@@ -298,10 +298,12 @@
 									this.startStatusPolling();
 								}
 							} else {
-								this.state = DeviceState.INCOMPATIBLE;
+								// Firmware < 1.0.0: set to CONNECTED but will show only firmware tab
+								this.state = DeviceState.CONNECTED;
 							}
 						} else {
-							this.state = DeviceState.INCOMPATIBLE;
+							// Couldn't get firmware version: set to CONNECTED but will show only firmware tab
+							this.state = DeviceState.CONNECTED;
 						}
 					} else {
 						// Product information not available or not SLTO00001 - treat as unknown device
@@ -1259,7 +1261,24 @@
 
 		// Device Card Component
 		function DeviceCard({ device, deviceManager, onStateChange }) {
-			const [activeTab, setActiveTab] = useState('control');
+			// Check if firmware needs update (version < 1.0.0)
+			const parseFirmwareVersion = (versionString) => {
+				if (!versionString) return null;
+				const match = versionString.match(/v?(\d+)\.(\d+)\.(\d+)/);
+				if (!match) return null;
+				return {
+					major: parseInt(match[1], 10),
+					minor: parseInt(match[2], 10),
+					patch: parseInt(match[3], 10)
+				};
+			};
+
+			const firmwareVersion = device?.firmwareVersion;
+			const parsedVersion = firmwareVersion ? parseFirmwareVersion(firmwareVersion) : null;
+			const needsFirmwareUpdate = !parsedVersion || parsedVersion.major < 1;
+
+			// If firmware needs update, default to firmware tab and only show that tab
+			const [activeTab, setActiveTab] = useState(needsFirmwareUpdate ? 'firmware' : 'control');
 
 			if (!device) {
 				if (!deviceManager) return null;
@@ -1313,72 +1332,6 @@
 				);
 			}
 
-			if (device.state === DeviceState.INCOMPATIBLE) {
-				return (
-					<div className="card shadow-sm" style={{ maxWidth: '40rem' }}>
-						<div className="card-header">
-							<div className="row">
-								<div className="col-auto">
-									<img
-										src="images/product-slto00001.png"
-										className="card-img-top"
-										style={{ height: '5rem', width: '5rem' }}
-										alt="Solder Ninja Pen"
-									/>
-								</div>
-								<div className="col overflow-x-hidden">
-									<h4 className="card-title mb-0 text-truncate d-inline-block w-100">
-										Solder Ninja Pen
-										{device.userInfo?.name?.[0] && <span> of {device.userInfo.name[0]}</span>}
-									</h4>
-									<p className="text-muted small">Connected via Web Serial API at 115200 baud</p>
-								</div>
-								<div className="col-auto">
-									<button
-										type="button"
-										className="btn btn-light"
-										onClick={() => deviceManager && deviceManager.removeDevice(device.id)}
-									>
-										<i className="bi bi-x-lg"></i>
-									</button>
-								</div>
-							</div>
-						</div>
-						<div className="card-body">
-							<div className="alert alert-warning align-items-center" role="alert">
-								<h4 className="alert-heading">Update needed</h4>
-								<p className="mb-0">The webapp uses a richer set of commands than the firmware on your device currently supports, so we need to update the firmware first. It should take less than a minute.</p>
-								<hr />
-								<div className="d-flex gap-2 justify-content-end">
-									<a
-										href="https://github.com/sitronlabs/Solder-Ninja-Pen-Firmware/releases"
-										className="alert-link"
-										target="_blank"
-										rel="noopener noreferrer"
-									>
-										Release notes
-									</a>
-									<a
-										href="#"
-										className="alert-link"
-										onClick={async (e) => {
-											e.preventDefault();
-											try {
-												await device.enterBootloader();
-												if (onStateChange) onStateChange();
-											} catch (error) {
-												console.error('Bootloader error:', error);
-											}
-										}}
-									>
-										Update now
-									</a>
-								</div>
-							</div>
-						</div>
-					</div>
-				);
-			}
 
 			if (device.state === DeviceState.FIRST_TIME) {
 				return (
@@ -1545,36 +1498,45 @@
 							<ul className="nav nav-tabs card-header-tabs mt-2" role="tablist">
 								<li className="nav-item" role="presentation">
 									<a
-										className={`nav-link ${activeTab === 'control' ? 'active' : ''}`}
+										className={`nav-link ${activeTab === 'control' ? 'active' : ''} ${needsFirmwareUpdate ? 'disabled' : ''}`}
 										href="#"
 										onClick={(e) => {
 											e.preventDefault();
-											setActiveTab('control');
+											if (!needsFirmwareUpdate) {
+												setActiveTab('control');
+											}
 										}}
+										style={needsFirmwareUpdate ? { pointerEvents: 'none', opacity: 0.5 } : {}}
 									>
 										Control
 									</a>
 								</li>
 								<li className="nav-item" role="presentation">
 									<a
-										className={`nav-link ${activeTab === 'preferences' ? 'active' : ''}`}
+										className={`nav-link ${activeTab === 'preferences' ? 'active' : ''} ${needsFirmwareUpdate ? 'disabled' : ''}`}
 										href="#"
 										onClick={(e) => {
 											e.preventDefault();
-											setActiveTab('preferences');
+											if (!needsFirmwareUpdate) {
+												setActiveTab('preferences');
+											}
 										}}
+										style={needsFirmwareUpdate ? { pointerEvents: 'none', opacity: 0.5 } : {}}
 									>
 										Preferences
 									</a>
 								</li>
 								<li className="nav-item" role="presentation">
 									<a
-										className={`nav-link ${activeTab === 'information' ? 'active' : ''}`}
+										className={`nav-link ${activeTab === 'information' ? 'active' : ''} ${needsFirmwareUpdate ? 'disabled' : ''}`}
 										href="#"
 										onClick={(e) => {
 											e.preventDefault();
-											setActiveTab('information');
+											if (!needsFirmwareUpdate) {
+												setActiveTab('information');
+											}
 										}}
+										style={needsFirmwareUpdate ? { pointerEvents: 'none', opacity: 0.5 } : {}}
 									>
 										Info
 									</a>
