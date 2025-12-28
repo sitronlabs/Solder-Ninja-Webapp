@@ -948,6 +948,25 @@
 							: 'Failed to save user information';
 						setErrorMessage(errorMsg);
 					} else {
+						// Reload user information from device to update the UI
+						try {
+							const userResponse = await device.connection.sendCommand({ action: 'user_information_get' });
+							if (userResponse.result === 'success' && userResponse.user) {
+								device.userInfo = userResponse.user;
+								// Update local state immediately to reflect changes
+								if (userResponse.user.name && Array.isArray(userResponse.user.name)) {
+									setNameLine1(userResponse.user.name[0] || '');
+									setNameLine2(userResponse.user.name[1] || '');
+								}
+								if (userResponse.user.icon && Array.isArray(userResponse.user.icon)) {
+									const iconBytes = userResponse.user.icon.map(b => parseInt(b));
+									setIconPixels(IconUtils.bytesToBitmap(iconBytes));
+								}
+							}
+						} catch (error) {
+							console.error('Error reloading user information:', error);
+						}
+
 						setIsDirty(false);
 						setErrorMessage(null);
 						if (onStateChange) onStateChange();
