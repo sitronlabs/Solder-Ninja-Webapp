@@ -18,15 +18,8 @@
 		}
 
 		.icon-pixel {
-			width: 12px;
-			height: 12px;
-		}
-
-		@media (max-width: 576px) {
-			.icon-pixel {
-				width: 16px;
-				height: 16px;
-			}
+			width: 5px;
+			height: 5px;
 		}
 	</style>
 </head>
@@ -696,22 +689,27 @@
 			};
 
 			return (
-				<div>
+				<div
+					style={{
+						height: '92px',
+						width: '92px'
+					}}>
 					<div
 						ref={editorRef}
 						style={{
 							display: 'inline-block',
-							border: '2px solid #333',
+							border: '1px solid #333',
+							borderRadius: '6px',
 							padding: '5px',
 							background: 'black',
-							userSelect: 'none'
+							userSelect: 'none',
 						}}
 					>
 						{Array.from({ length: 16 }, (_, row) => (
 							<div
 								key={row}
 								className="icon-row"
-								style={{ display: 'block', lineHeight: 0 }}
+								style={{ display: 'block', lineHeight: 0, height: '5px' }}
 							>
 								{Array.from({ length: 16 }, (_, col) => {
 									const index = row * 16 + col;
@@ -722,7 +720,7 @@
 											data-col={col}
 											className={`icon-pixel ${pixels[index] ? 'black' : ''}`}
 											style={{
-												border: '1px solid #333',
+												border: '0px',
 												display: 'inline-block',
 												cursor: 'pointer',
 												backgroundColor: pixels[index] ? 'white' : 'black',
