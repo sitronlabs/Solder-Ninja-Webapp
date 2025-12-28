@@ -654,11 +654,6 @@
 				if (onDirtyChange) onDirtyChange(true);
 			};
 
-			const invertIcon = () => {
-				const newPixels = pixels.map(p => !p);
-				onChange(newPixels);
-				if (onDirtyChange) onDirtyChange(true);
-			};
 
 			const handleImageLoad = async (e) => {
 				const file = e.target.files[0];
@@ -688,14 +683,12 @@
 			};
 
 			return (
-				<div
-					style={{
-						height: '92px',
-						width: '92px'
-					}}>
+				<div className="d-flex flex-row">
 					<div
 						ref={editorRef}
 						style={{
+							height: '92px',
+							width: '92px',
 							display: 'inline-block',
 							border: '1px solid #333',
 							borderRadius: '6px',
@@ -738,23 +731,17 @@
 							</div>
 						))}
 					</div>
-					<div className="mt-2">
+					<div className="d-flex flex-column ms-3">
 						<button
 							type="button"
-							className="btn btn-sm btn-outline-secondary"
+							className="btn btn-light border mb-3"
 							onClick={clearIcon}
+							aria-label="Clear icon"
 						>
-							Clear Icon
+							<i className="bi bi-eraser"></i>
 						</button>
-						<button
-							type="button"
-							className="btn btn-sm btn-outline-secondary ms-2"
-							onClick={invertIcon}
-						>
-							Invert Icon
-						</button>
-						<label className="btn btn-sm btn-outline-secondary ms-2" style={{ marginBottom: 0 }}>
-							Load Image
+						<label className="btn btn-light border" style={{ marginBottom: 0 }} aria-label="Load image">
+							<i className="bi bi-file-earmark-arrow-up"></i>
 							<input
 								type="file"
 								accept="image/*"
