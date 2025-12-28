@@ -1162,6 +1162,7 @@
 			const [activeTab, setActiveTab] = useState('control');
 
 			if (!device) {
+				if (!deviceManager) return null;
 				return (
 					<div className="card shadow-sm" style={{ maxWidth: '40rem' }}>
 						<div className="card-header">
@@ -1170,6 +1171,7 @@
 								className="btn btn-light btn-lg w-100"
 								aria-label="Connect to a new device"
 								onClick={async () => {
+									if (!deviceManager) return;
 									try {
 										await deviceManager.addDevice();
 									} catch (error) {
@@ -1200,7 +1202,7 @@
 									<button
 										type="button"
 										className="btn btn-light"
-										onClick={() => deviceManager.removeDevice(device.id)}
+										onClick={() => deviceManager && deviceManager.removeDevice(device.id)}
 									>
 										<i className="bi bi-x-lg"></i>
 									</button>
@@ -1235,7 +1237,7 @@
 									<button
 										type="button"
 										className="btn btn-light"
-										onClick={() => deviceManager.removeDevice(device.id)}
+										onClick={() => deviceManager && deviceManager.removeDevice(device.id)}
 									>
 										<i className="bi bi-x-lg"></i>
 									</button>
@@ -1299,7 +1301,7 @@
 									<button
 										type="button"
 										className="btn btn-light"
-										onClick={() => deviceManager.removeDevice(device.id)}
+										onClick={() => deviceManager && deviceManager.removeDevice(device.id)}
 									>
 										<i className="bi bi-x-lg"></i>
 									</button>
@@ -1425,7 +1427,7 @@
 									<button
 										type="button"
 										className="btn btn-light"
-										onClick={() => deviceManager.removeDevice(device.id)}
+										onClick={() => deviceManager && deviceManager.removeDevice(device.id)}
 									>
 										<i className="bi bi-x-lg"></i>
 									</button>
@@ -1498,14 +1500,13 @@
 		// Main App Component
 		function App() {
 			const [devices, setDevices] = useState([]);
-			const deviceManagerRef = useRef(null);
+			const deviceManagerRef = useRef(new DeviceManager());
 
 			useEffect(() => {
-				const manager = new DeviceManager();
+				const manager = deviceManagerRef.current;
 				manager.onDeviceChange = () => {
 					setDevices([...manager.getDevices()]);
 				};
-				deviceManagerRef.current = manager;
 
 				const handleVisibilityChange = () => {
 					const isVisible = !document.hidden;
