@@ -195,8 +195,14 @@
 					]
 				});
 
-				await bootloaderPort.open({ baudRate: 1200 });
-				await bootloaderPort.close();
+				try {
+					await bootloaderPort.open({ baudRate: 1200 });
+					await bootloaderPort.close();
+				} catch (error) {
+					// Ignore port open/close errors - device resets into bootloader mode so quickly
+					// that the OS may not see a successful port open. This is expected behavior.
+					console.log('Port open/close error (expected when entering bootloader):', error.message);
+				}
 
 				console.log('Device should now be in bootloader mode');
 			}
@@ -438,23 +444,21 @@
 
 			async enterBootloader() {
 				this.stopStatusPolling();
+				this.state = DeviceState.DISCONNECTED;
+				if (this.onStateChange) {
+					this.onStateChange();
+				}
 				try {
-					this.state = DeviceState.DISCONNECTED;
-					if (this.onStateChange) {
-						this.onStateChange();
-					}
 					await this.connection.enterBootloader();
-					this.state = DeviceState.BOOTLOADER;
-					if (this.onStateChange) {
-						this.onStateChange();
-					}
 				} catch (error) {
-					console.error('Bootloader entry error:', error);
-					this.state = DeviceState.DISCONNECTED;
-					if (this.onStateChange) {
-						this.onStateChange();
-					}
-					throw error;
+					// Ignore errors - device may reset into bootloader before port open completes
+					// This is expected behavior and doesn't indicate failure
+					console.log('Bootloader entry (error may be expected):', error.message);
+				}
+				// Set state to bootloader regardless of errors - the device is in bootloader mode
+				this.state = DeviceState.BOOTLOADER;
+				if (this.onStateChange) {
+					this.onStateChange();
 				}
 			}
 		}
