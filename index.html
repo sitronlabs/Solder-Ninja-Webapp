@@ -282,15 +282,10 @@
 								const userResponse = await this.connection.sendCommand({ action: 'user_information_get' });
 								if (userResponse.result === 'success' && userResponse.user) {
 									this.userInfo = userResponse.user;
-									if (userResponse.user.name &&
-										userResponse.user.name[0] === 'Customize at' &&
-										userResponse.user.name[1] === 'solder.ninja') {
-										this.state = DeviceState.FIRST_TIME;
-									} else {
-										this.state = DeviceState.CONNECTED;
-										await this.loadInitialData();
-										this.startStatusPolling();
-									}
+									// Set to CONNECTED even for first-time users - they'll see preferences tab with alert
+									this.state = DeviceState.CONNECTED;
+									await this.loadInitialData();
+									this.startStatusPolling();
 								} else {
 									this.state = DeviceState.CONNECTED;
 									await this.loadInitialData();
@@ -907,6 +902,9 @@
 			const [isLoading, setIsLoading] = useState(false);
 			const [errorMessage, setErrorMessage] = useState(null);
 
+			// Check if it's first time (default name values)
+			const isFirstTime = device?.userInfo?.name?.[0] === 'Customize at' && device?.userInfo?.name?.[1] === 'solder.ninja';
+
 			useEffect(() => {
 				if (device && device.userInfo) {
 					if (device.userInfo.name && Array.isArray(device.userInfo.name)) {
@@ -985,6 +983,11 @@
 
 			return (
 				<div>
+					{isFirstTime && (
+						<div className="alert alert-success align-items-center mb-3" role="alert">
+							<p className="mb-0">It looks like you're using your Solder Ninja Pen for the first time. Did you know you can make it your own by displaying your name at startup?</p>
+						</div>
+					)}
 					<div className="row">
 						<div className="col">
 							<label className="form-label">
@@ -1321,8 +1324,26 @@
 			const parsedVersion = firmwareVersion ? parseFirmwareVersion(firmwareVersion) : null;
 			const needsFirmwareUpdate = !parsedVersion || parsedVersion.major < 1;
 
-			// If firmware needs update, default to firmware tab and only show that tab
-			const [activeTab, setActiveTab] = useState(needsFirmwareUpdate ? 'firmware' : 'control');
+			// Check if it's first time (default name values)
+			const isFirstTime = device?.userInfo?.name?.[0] === 'Customize at' && device?.userInfo?.name?.[1] === 'solder.ninja';
+
+			// Determine initial tab: firmware update takes priority, then first-time (preferences), then control
+			const getInitialTab = () => {
+				if (needsFirmwareUpdate) return 'firmware';
+				if (isFirstTime) return 'preferences';
+				return 'control';
+			};
+
+			const [activeTab, setActiveTab] = useState(getInitialTab());
+
+			// Update tab when first-time status or firmware update need changes
+			useEffect(() => {
+				if (needsFirmwareUpdate) {
+					setActiveTab('firmware');
+				} else if (isFirstTime) {
+					setActiveTab('preferences');
+				}
+			}, [isFirstTime, needsFirmwareUpdate]);
 
 			if (!device) {
 				if (!deviceManager) return null;
@@ -1377,73 +1398,6 @@
 			}
 
 
-			if (device.state === DeviceState.FIRST_TIME) {
-				return (
-					<div className="card shadow-sm" style={{ maxWidth: '40rem' }}>
-						<div className="card-header">
-							<div className="row">
-								<div className="col-auto">
-									<img
-										src="images/product-slto00001.png"
-										className="card-img-top"
-										style={{ height: '5rem', width: '5rem' }}
-										alt="Solder Ninja Pen"
-									/>
-								</div>
-								<div className="col overflow-x-hidden">
-									<h4 className="card-title mb-0 text-truncate d-inline-block w-100">Solder Ninja Pen</h4>
-									<p className="text-muted small">Connected via Web Serial API at 115200 bauds</p>
-								</div>
-								<div className="col-auto">
-									<button
-										type="button"
-										className="btn btn-light"
-										onClick={() => deviceManager && deviceManager.removeDevice(device.id)}
-									>
-										<i className="bi bi-x-lg"></i>
-									</button>
-								</div>
-							</div>
-						</div>
-						<div className="card-body">
-							<div className="alert alert-success align-items-center" role="alert">
-								<h4 className="alert-heading">Customize</h4>
-								<p className="mb-0">It looks like you're using your Solder Ninja Pen for the first time. Did you know you can make it your own by displaying your name at startup?</p>
-								<hr />
-								<div className="d-flex gap-2 justify-content-end">
-									<a
-										href="#"
-										className="alert-link"
-										onClick={async (e) => {
-											e.preventDefault();
-											device.state = DeviceState.CONNECTED;
-											await device.loadInitialData();
-											device.startStatusPolling();
-											if (onStateChange) onStateChange();
-										}}
-									>
-										Not for now
-									</a>
-									<a
-										href="#"
-										className="alert-link"
-										onClick={async (e) => {
-											e.preventDefault();
-											device.state = DeviceState.CONNECTED;
-											await device.loadInitialData();
-											device.startStatusPolling();
-											setActiveTab('preferences');
-											if (onStateChange) onStateChange();
-										}}
-									>
-										Yes, please!
-									</a>
-								</div>
-							</div>
-						</div>
-					</div>
-				);
-			}
 
 			if (device.state === DeviceState.DISCONNECTED || device.state === DeviceState.BOOTLOADER) {
 				// Only show as Solder Ninja Pen if we have confirmed product info
