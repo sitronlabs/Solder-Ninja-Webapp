@@ -334,8 +334,9 @@
 			async loadInitialData() {
 				try {
 					const statusResponse = await this.connection.sendCommand({ action: 'controller_status_get' });
-					if (statusResponse.result === 'success' && statusResponse.status) {
-						this.updateStatus(statusResponse.status);
+					if (statusResponse.result === 'success') {
+						// Status data is directly in the response, not nested under 'status'
+						this.updateStatus(statusResponse);
 					}
 					const targetResponse = await this.connection.sendCommand({ action: 'controller_temperature_target_get' });
 					if (targetResponse.result === 'success' && targetResponse.temperature_c !== undefined) {
@@ -349,11 +350,15 @@
 			updateStatus(status) {
 				this.status = status;
 				const oldState = this.deviceState;
-				if (status.temperature && status.temperature.measured !== undefined) {
-					this.temperatureCurrent = status.temperature.measured;
-				}
-				if (status.temperature && status.temperature.target !== undefined) {
-					this.temperatureTarget = status.temperature.target;
+
+				// Extract temperature from status response
+				if (status.temperature) {
+					if (status.temperature.measured !== undefined) {
+						this.temperatureCurrent = status.temperature.measured;
+					}
+					if (status.temperature.target !== undefined) {
+						this.temperatureTarget = status.temperature.target;
+					}
 				}
 				if (status.state !== undefined) {
 					if (typeof status.state === 'string') {
@@ -373,14 +378,16 @@
 			startStatusPolling() {
 				this.stopStatusPolling();
 				if (!this.pageVisible) return;
+				if (this.state !== DeviceState.CONNECTED) return;
 
 				const interval = this.deviceState === 2 ? 100 : 500;
 				this.pollingInterval = setInterval(async () => {
 					if (this.state === DeviceState.CONNECTED && this.pageVisible) {
 						try {
 							const response = await this.connection.sendCommand({ action: 'controller_status_get' });
-							if (response.result === 'success' && response.status) {
-								this.updateStatus(response.status);
+							if (response.result === 'success') {
+								// Status data is directly in the response, not nested under 'status'
+								this.updateStatus(response);
 								if (this.onStatusUpdate) {
 									this.onStatusUpdate();
 								}
@@ -764,12 +771,26 @@
 		// Control Tab Component
 		function ControlTab({ device, onStateChange }) {
 			const [localTarget, setLocalTarget] = useState(device?.temperatureTarget || 300);
+			const [updateTrigger, setUpdateTrigger] = useState(0);
 
 			useEffect(() => {
 				if (device?.temperatureTarget !== undefined) {
 					setLocalTarget(device.temperatureTarget);
 				}
 			}, [device?.temperatureTarget]);
+
+			// Listen for status updates to force re-render
+			useEffect(() => {
+				if (!device) return;
+				const originalOnStatusUpdate = device.onStatusUpdate;
+				device.onStatusUpdate = () => {
+					if (originalOnStatusUpdate) originalOnStatusUpdate();
+					setUpdateTrigger(prev => prev + 1);
+				};
+				return () => {
+					device.onStatusUpdate = originalOnStatusUpdate;
+				};
+			}, [device]);
 
 			if (!device) return null;
 
@@ -780,7 +801,11 @@
 					} else {
 						await device.connection.sendCommand({ action: 'controller_lock' });
 					}
-					await device.connection.sendCommand({ action: 'controller_status_get' });
+					// Get updated status after toggle
+					const statusResponse = await device.connection.sendCommand({ action: 'controller_status_get' });
+					if (statusResponse.result === 'success') {
+						device.updateStatus(statusResponse);
+					}
 					if (onStateChange) onStateChange();
 				} catch (error) {
 					console.error('Lock toggle error:', error);
