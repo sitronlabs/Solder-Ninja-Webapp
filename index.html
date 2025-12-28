@@ -827,8 +827,8 @@
 			};
 
 			const lockIcon = device.deviceState === 0 ? 'bi-lock' : 'bi-unlock';
-			const progressPercentage = device.temperatureCurrent ? (device.temperatureCurrent / 400) * 100 : 0;
-			const progressColor = device.deviceState === 2 ? 'bg-warning' : 'bg-secondary';
+			const progressPercentage = Math.min(Math.max(device.temperatureCurrent ? (device.temperatureCurrent / 400) * 100 : 0, 0), 100);
+			const progressColor = device.deviceState === 2 ? 'bg-primary' : 'bg-secondary';
 
 			return (
 				<div>
@@ -861,7 +861,7 @@
 									style={{ width: `${progressPercentage}%`, height: '38px' }}
 								>
 									<div
-										className={`progress-bar progress-bar-striped ${device.deviceState === 2 ? 'progress-bar-animated' : ''} ${progressColor} text-bg-warning`}
+										className={`progress-bar progress-bar-striped ${device.deviceState === 2 ? 'progress-bar-animated' : ''} ${progressColor} text-bg-primary`}
 									>
 										{device.temperatureCurrent ? `${device.temperatureCurrent.toFixed(0)} °C` : '-- °C'}
 									</div>
