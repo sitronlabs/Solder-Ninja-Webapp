@@ -257,6 +257,7 @@
 			async probe() {
 				try {
 					const productResponse = await this.connection.sendCommand({ action: 'product_information_get' });
+					// Only proceed if we get a successful response with SLTO00001 product code
 					if (productResponse.result === 'success' && productResponse.number === 'SLTO00001') {
 						this.productInfo = productResponse;
 						const versionResponse = await this.connection.sendCommand({ action: 'firmware_version_get' });
@@ -288,7 +289,9 @@
 							this.state = DeviceState.INCOMPATIBLE;
 						}
 					} else {
-						this.state = DeviceState.INCOMPATIBLE;
+						// Product information not available or not SLTO00001 - treat as unknown device
+						// Keep in PROBING state to show unknown device card
+						this.state = DeviceState.PROBING;
 					}
 					if (this.onStateChange) {
 						this.onStateChange();
@@ -1349,22 +1352,31 @@
 			}
 
 			if (device.state === DeviceState.DISCONNECTED || device.state === DeviceState.BOOTLOADER) {
+				// Only show as Solder Ninja Pen if we have confirmed product info
+				const isSolderNinjaPen = device.productInfo && device.productInfo.number === 'SLTO00001';
+				const deviceName = isSolderNinjaPen ? 'Solder Ninja Pen' : 'Unknown device';
+				const deviceImage = isSolderNinjaPen ? (
+					<img
+						src="images/product-slto00001.png"
+						className="card-img-top"
+						style={{ height: '5rem', width: '5rem' }}
+						alt="Solder Ninja Pen"
+					/>
+				) : (
+					<div className="card-img-top placeholder rounded" style={{ height: '5rem', width: '5rem' }}></div>
+				);
+
 				return (
 					<div className="card shadow-sm" style={{ maxWidth: '40rem' }}>
 						<div className="card-header">
 							<div className="row">
 								<div className="col-auto">
-									<img
-										src="images/product-slto00001.png"
-										className="card-img-top"
-										style={{ height: '5rem', width: '5rem' }}
-										alt="Solder Ninja Pen"
-									/>
+									{deviceImage}
 								</div>
 								<div className="col overflow-x-hidden">
 									<h4 className="card-title mb-0 text-truncate d-inline-block w-100">
-										Solder Ninja Pen
-										{device.userInfo?.name?.[0] && <span> of {device.userInfo.name[0]}</span>}
+										{deviceName}
+										{isSolderNinjaPen && device.userInfo?.name?.[0] && <span> of {device.userInfo.name[0]}</span>}
 									</h4>
 									<p className="text-muted small">
 										{device.state === DeviceState.BOOTLOADER ? 'Bootloader mode' : 'Disconnected'}
@@ -1374,7 +1386,7 @@
 									<button
 										type="button"
 										className="btn btn-light"
-										onClick={() => deviceManager.removeDevice(device.id)}
+										onClick={() => deviceManager && deviceManager.removeDevice(device.id)}
 									>
 										<i className="bi bi-x-lg"></i>
 									</button>
