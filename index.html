@@ -1470,7 +1470,9 @@
 								<div className="col overflow-x-hidden">
 									<h4 className="card-title mb-0 text-truncate d-inline-block w-100">
 										{deviceName}
-										{isSolderNinjaPen && device.userInfo?.name?.[0] && <span> of {device.userInfo.name[0]}</span>}
+										{isSolderNinjaPen && device.userInfo?.name?.[0] &&
+											!(device.userInfo.name[0] === 'Customize at' && device.userInfo.name[1] === 'solder.ninja') &&
+											<span> of {device.userInfo.name[0]}</span>}
 									</h4>
 									<p className="text-muted small">
 										{device.state === DeviceState.BOOTLOADER ? 'Bootloader mode' : 'Disconnected'}
@@ -1509,7 +1511,9 @@
 			}
 
 			if (device.state === DeviceState.CONNECTED) {
-				const userName = device.userInfo?.name?.[0] ? ` of ${device.userInfo.name[0]}` : '';
+				// Don't show name if it's the first-time default values
+				const isFirstTimeName = device.userInfo?.name?.[0] === 'Customize at' && device.userInfo?.name?.[1] === 'solder.ninja';
+				const userName = (device.userInfo?.name?.[0] && !isFirstTimeName) ? ` of ${device.userInfo.name[0]}` : '';
 
 				return (
 					<div className="card shadow-sm" style={{ maxWidth: '40rem' }}>
