@@ -45,6 +45,7 @@
 				this.reader = null;
 				this.readerBuffer = '';
 				this.connected = false;
+				this.onDisconnect = null; // Callback for disconnect events
 			}
 
 			async connect(filters) {
@@ -58,6 +59,15 @@
 				this.writer = this.port.writable.getWriter();
 				this.reader = this.port.readable.getReader();
 				this.connected = true;
+
+				// Listen for disconnect events (when device is unplugged)
+				this.port.addEventListener('disconnect', () => {
+					console.log('Serial port disconnect event detected');
+					this.connected = false;
+					if (this.onDisconnect) {
+						this.onDisconnect();
+					}
+				});
 
 				console.log('Serial port connected');
 				return this.port;
@@ -229,6 +239,11 @@
 				this.temperatureCurrent = null;
 				this.temperatureTarget = null;
 				this.deviceState = 0; // 0=locked, 1=idle, 2=active
+
+				// Set up disconnect callback on connection
+				this.connection.onDisconnect = () => {
+					this.handleDisconnection();
+				};
 			}
 
 			async connect() {
