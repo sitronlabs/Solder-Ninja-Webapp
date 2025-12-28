@@ -901,6 +901,7 @@
 			const [iconPixels, setIconPixels] = useState(Array(16 * 16).fill(false));
 			const [isDirty, setIsDirty] = useState(false);
 			const [isLoading, setIsLoading] = useState(false);
+			const [errorMessage, setErrorMessage] = useState(null);
 
 			useEffect(() => {
 				if (device && device.userInfo) {
@@ -923,26 +924,37 @@
 				const line2 = nameLine2.trim();
 
 				if (line1.length === 0 || line2.length === 0) {
-					console.error('Both name lines must have at least 1 character');
+					setErrorMessage('Both name lines must have at least 1 character');
 					return;
 				}
 				if (line1.length > 12 || line2.length > 12) {
-					console.error('Name lines must be 12 characters or less');
+					setErrorMessage('Name lines must be 12 characters or less');
 					return;
 				}
 
 				setIsLoading(true);
+				setErrorMessage(null);
 				try {
 					const iconBytes = IconUtils.bitmapToBytes(iconPixels);
-					await device.connection.sendCommand({
+					const response = await device.connection.sendCommand({
 						action: 'user_information_set',
 						icon: iconBytes,
 						name: [line1, line2]
 					});
-					setIsDirty(false);
-					if (onStateChange) onStateChange();
+
+					if (response.result === 'failure') {
+						const errorMsg = response.errors && response.errors.length > 0
+							? response.errors.join(', ')
+							: 'Failed to save user information';
+						setErrorMessage(errorMsg);
+					} else {
+						setIsDirty(false);
+						setErrorMessage(null);
+						if (onStateChange) onStateChange();
+					}
 				} catch (error) {
 					console.error('Save error:', error);
+					setErrorMessage(error.message || 'Failed to save user information');
 				} finally {
 					setIsLoading(false);
 				}
@@ -970,26 +982,37 @@
 								type="text"
 								className="form-control mb-3"
 								placeholder="First name"
-								maxLength={12}
+								maxlength={12}
 								value={nameLine1}
 								onChange={(e) => {
 									setNameLine1(e.target.value);
 									setIsDirty(true);
+									setErrorMessage(null);
 								}}
 							/>
 							<input
 								type="text"
 								className="form-control"
 								placeholder="Last name"
-								maxLength={12}
+								maxlength={12}
 								value={nameLine2}
 								onChange={(e) => {
 									setNameLine2(e.target.value);
 									setIsDirty(true);
+									setErrorMessage(null);
 								}}
 							/>
 						</div>
 					</div>
+					{errorMessage && (
+						<div className="row mt-3">
+							<div className="col">
+								<div className="alert alert-danger" role="alert">
+									{errorMessage}
+								</div>
+							</div>
+						</div>
+					)}
 					{isDirty && (
 						<div className="row mt-3">
 							<div className="col">
