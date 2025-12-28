@@ -1010,7 +1010,58 @@
 
 		// Information Tab Component
 		function InformationTab({ device }) {
+			const [diagnostics, setDiagnostics] = useState({ heatingTime: null, maxVoltage: null });
+
+			useEffect(() => {
+				if (!device || !device.connection) return;
+
+				const fetchDiagnostics = async () => {
+					try {
+						// Get heating time
+						try {
+							const heatingTimeResponse = await device.connection.sendCommand({ action: 'heating_time_get' });
+							if (heatingTimeResponse.result === 'success' && heatingTimeResponse.heating && heatingTimeResponse.heating.time !== undefined) {
+								setDiagnostics(prev => ({
+									...prev,
+									heatingTime: heatingTimeResponse.heating.time
+								}));
+							}
+						} catch (error) {
+							console.error('Error fetching heating time:', error);
+						}
+
+						// Get max USB voltage
+						try {
+							const voltageResponse = await device.connection.sendCommand({ action: 'usb_voltage_max_get' });
+							if (voltageResponse.result === 'success' && voltageResponse.usb && voltageResponse.usb.voltage_max !== undefined) {
+								setDiagnostics(prev => ({
+									...prev,
+									maxVoltage: voltageResponse.usb.voltage_max
+								}));
+							}
+						} catch (error) {
+							console.error('Error fetching max voltage:', error);
+						}
+					} catch (error) {
+						console.error('Error fetching diagnostics:', error);
+					}
+				};
+
+				fetchDiagnostics();
+			}, [device]);
+
 			if (!device || !device.productInfo) return null;
+
+			// Format heating time (seconds to hours and minutes)
+			const formatHeatingTime = (seconds) => {
+				if (seconds === null || seconds === undefined) return '--';
+				const hours = Math.floor(seconds / 3600);
+				const minutes = Math.floor((seconds % 3600) / 60);
+				if (hours > 0) {
+					return `${hours}h ${minutes}m`;
+				}
+				return `${minutes}m`;
+			};
 
 			return (
 				<div>
@@ -1044,9 +1095,15 @@
 					</div>
 					<div className="row">
 						<div className="col-3">
-							<strong>Firmware:</strong>
+							<strong>Soldering time:</strong>
 						</div>
-						<div className="col-9">{device.firmwareVersion || '--'}</div>
+						<div className="col-9">{formatHeatingTime(diagnostics.heatingTime)}</div>
+					</div>
+					<div className="row">
+						<div className="col-3">
+							<strong>Max voltage:</strong>
+						</div>
+						<div className="col-9">{diagnostics.maxVoltage !== null ? `${diagnostics.maxVoltage.toFixed(1)} V` : '--'}</div>
 					</div>
 				</div>
 			);
